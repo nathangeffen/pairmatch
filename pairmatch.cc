@@ -33,7 +33,6 @@ struct InitialVals {
   double max_x_coord = 10.0;
   double max_y_coord = 10.0;
   unsigned last_agent = 0;
-  unsigned seed = 0;
   bool verbose = false;
 
   // proportions for distance calc
@@ -46,9 +45,9 @@ struct InitialVals {
 
 class Agent {
 private:
-  InitialVals& initial_vals_;
+  InitialVals &initial_vals_;
 public:
-  Agent(InitialVals & initial_vals) : initial_vals_(initial_vals) {
+  Agent(InitialVals &initial_vals) : initial_vals_(initial_vals) {
     std::uniform_real_distribution<double> uni;
     std::uniform_real_distribution<double> uni_x(0, initial_vals_.max_x_coord);
     std::uniform_real_distribution<double> uni_y(0, initial_vals_.max_y_coord);
@@ -121,30 +120,17 @@ public:
 
 
 class Simulation {
-private:
-  bool free_initial_vals_ = false;
-  InitialVals *initial_vals_;
 public:
+  InitialVals &initial_vals;
   std::vector<Agent *> agents;
-  InitialVals initial_vals;
   unsigned iteration = 0;
   std::vector<unsigned> positions;
 
-  Simulation(InitialVals *initial_vals_parm = NULL)
-  {
-    if (initial_vals_parm) {
-      initial_vals = *initial_vals_parm;
-    } else {
-      initial_vals_ = (new InitialVals());
-      initial_vals = *initial_vals_;
-      free_initial_vals_ = true;
-    }
-    initial_vals.rng.seed(initial_vals.seed);
-  }
+  Simulation(InitialVals &initial_vals_parm) : initial_vals(initial_vals_parm)
+  {}
 
   ~Simulation() {
     for (auto &a : agents) delete a;
-    if (free_initial_vals_) delete initial_vals_;
   }
 
   void init_population(std::size_t size)
@@ -450,16 +436,13 @@ void run_tests(std::size_t population = 16,
 	       unsigned iterations = 1,
 	       unsigned seed = 0,
 	       unsigned runs = 1,
+	       std::string algorithms = std::string("RNWCB"),
 	       bool verbose = true)
 {
   InitialVals initial_vals;
 
-  initial_vals.seed = seed;
   initial_vals.verbose = verbose;
-
-  Simulation s(&initial_vals);
-
-  s.init_population(population);
+  initial_vals.rng.seed(seed);
 
   if (verbose) {
     std::cout << "Population: " << population << std::endl;
@@ -467,18 +450,23 @@ void run_tests(std::size_t population = 16,
     std::cout << "Neighbors: " << neighbors << std::endl;
   }
 
-  if (verbose) s.print_agent_ids(s.agents);
-
   for (unsigned i = 0; i < runs; ++i) {
-    stats(s, "Random match", [&](){s.random_match();}, iterations, i);
-    stats(s, "Random match n", [&](){s.random_match_n(neighbors);},
+    Simulation s(initial_vals);
+    s.init_population(population);
+    if (algorithms.find("R") != std::string::npos)
+      stats(s, "Random match", [&](){s.random_match();}, iterations, i);
+    if (algorithms.find("N") != std::string::npos)
+      stats(s, "Random match n", [&](){s.random_match_n(neighbors);},
 	  iterations, i);
-    stats(s, "Weighted shuffle", [&](){s.weighted_shuffle_match(neighbors); },
+    if (algorithms.find("W") != std::string::npos)
+      stats(s, "Weighted shuffle", [&](){s.weighted_shuffle_match(neighbors); },
 	  iterations, i);
-    stats(s, "Cluster shuffle", [&](){
-	s.cluster_shuffle_match(clusters, neighbors);
-      }, iterations, i);
-    stats(s, "Brute force", [&](){s.brute_force_match();}, iterations, i);
+    if (algorithms.find("C") != std::string::npos)
+      stats(s, "Cluster shuffle", [&](){
+	  s.cluster_shuffle_match(clusters, neighbors);
+	}, iterations, i);
+    if (algorithms.find("B") != std::string::npos)
+      stats(s, "Brute force", [&](){s.brute_force_match();}, iterations, i);
   }
 }
 
@@ -493,6 +481,8 @@ int main(int argc, char *argv[])
   char *iterations_str = getCmdOption(argv, argv + argc, "-i");
   char *seed_str = getCmdOption(argv, argv + argc, "-s");
   char *runs_str = getCmdOption(argv, argv + argc, "-r");
+  char *alg_str = getCmdOption(argv, argv + argc, "-a");
+  std::string algorithms = "RNWCB";
 
   if (population_str) {
     population = atoi(population_str);
@@ -510,8 +500,11 @@ int main(int argc, char *argv[])
     seed = atoi(seed_str);
   if (runs_str)
     runs = atoi(runs_str);
+  if (alg_str)
+    algorithms = alg_str;
   if(cmdOptionExists(argv, argv+argc, "-v"))
     verbose = true;
 
-  run_tests(population, clusters, neighbors, iterations, seed, runs, verbose);
+  run_tests(population, clusters, neighbors, iterations,
+	    seed, runs, std::string(algorithms), verbose);
 }
