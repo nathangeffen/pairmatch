@@ -40,7 +40,7 @@ struct InitialVals {
   double orientation_factor = 100.0;
   double tightness_factor = 1.0;
   double distance_factor = 0.1;
-  double previous_partner_factor = 500;
+  double previous_partner_factor = 500.0;
 };
 
 class Agent {
