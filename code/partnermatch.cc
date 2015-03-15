@@ -3,6 +3,7 @@
 #include <cmath>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <iostream>
 #include <functional>
@@ -372,6 +373,29 @@ median (InputIterator  from, InputIterator to, bool sorted = false)
   return median;
 }
 
+template<class InputIterator> double
+stddev (InputIterator  from, InputIterator to, double mean)
+{
+  double total = 0.0;
+
+  for (auto it = from; it != to; ++it)
+    total += (*it - mean) * (*it - mean);
+  auto variance =  (1.0 / ( double (to - from) - 1.0) ) * total;
+  return sqrt(variance);
+}
+
+template<class InputIterator> std::array<double, 3>
+med_iqr(InputIterator  from, InputIterator to, bool sorted = false)
+{
+  std::array<double, 3> results;
+  results[1] = median(from, to, sorted);
+  size_t lqr = 0.25 * (to - from);
+  results[0] = *(from + lqr);
+  size_t hqr = 0.75 * (to - from);
+  results[2] = *(from + hqr);
+  return results;
+}
+
 void
 stats(Simulation &s, const char *description,
       std::function<void(void)> func, unsigned iterations = 1, unsigned run = 0)
@@ -398,9 +422,16 @@ stats(Simulation &s, const char *description,
 
     std::cout << run << ", " << description  << ", " << i << ", mean, "
 	      << mean << std::endl;
-    auto mdn = median(s.positions.begin(), s.positions.end());
+    auto statistics = med_iqr(s.positions.begin(), s.positions.end());
     std::cout << run << ", " << description  << ", " << i << ", median, "
-	      << mdn << std::endl;
+	      << statistics[1] << std::endl;
+    std::cout << run << ", " << description  << ", " << i << ", 25%, "
+	      << statistics[0] << std::endl;
+    std::cout << run << ", " << description  << ", " << i << ", 75%, "
+	      << statistics[2] << std::endl;
+    auto st = stddev(s.positions.begin(), s.positions.end(), mean);
+    std::cout << run << ", " << description  << ", " << i << ", stddev, "
+	      << st << std::endl;
   }
 }
 
@@ -483,6 +514,10 @@ int main(int argc, char *argv[])
   char *runs_str = getCmdOption(argv, argv + argc, "-r");
   char *alg_str = getCmdOption(argv, argv + argc, "-a");
   std::string algorithms = "RNWCB";
+
+  for (int i = 0; i < argc; ++i)
+    std::cout << argv[i] << " ";
+  std::cout << std::endl;
 
   if (population_str) {
     population = atoi(population_str);

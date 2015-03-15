@@ -8,7 +8,7 @@ CXXFLAGS  = -g -Wall -std=c++11
 RELFLAGS = -O3 -std=c++11
 
 # the build target executable:
-TARGET = pairmatch
+TARGET = partnermatch
 
 all: $(TARGET)
 
