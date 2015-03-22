@@ -1,3 +1,8 @@
+/* Code to test partner matching algorithms.
+   Copyright (C) Nathan Geffen.
+   See LICENSE file for copyright details.
+*/
+
 #include <cassert>
 #include <cfloat>
 #include <cmath>
@@ -17,10 +22,7 @@
 
 class Agent;
 
-struct Partnership {
-  unsigned partner_id;
-  double date_started;
-};
+/* Parameters for the simulation are encapsulated in this struct. */
 
 struct InitialVals {
   std::mt19937 rng;
@@ -64,6 +66,8 @@ public:
     x_coord = uni_x(initial_vals_.rng);
     y_coord = uni_y(initial_vals_.rng);
   }
+
+  /* Standard euclidean plane distance function. */
   double euclidean_distance(const Agent &a)
   {
     double x_d = (x_coord - a.x_coord);
@@ -71,6 +75,11 @@ public:
     return std::sqrt(x_d * x_d + y_d * y_d);
   }
 
+  /* This determines the suitability of a partnership between
+     two agents. The smaller the value returned the more
+     suitable the partnership. This and the cluster function
+     are the only domain specific code here.
+  */
   double distance(const Agent &a, unsigned partner_count = 0)
   {
     double prev_partner;
@@ -97,6 +106,10 @@ public:
       fabs(tightness_diff) + fabs(distance_diff) + prev_partner;
   }
 
+
+  /* Function used to cluster agents with similar attributes
+     close to each other.
+   */
   double cluster_value()
   {
     return initial_vals_.age_factor * dob +
@@ -119,6 +132,11 @@ public:
   std::vector<Agent* > partners;
 };
 
+
+/* Class that contains simulation management functions
+   and the partner matching algorithms that are being
+   compared.
+*/
 
 class Simulation {
 public:
@@ -152,11 +170,16 @@ public:
     std::cout << after;
   }
 
+  /* Clear memory of previous partnerships. */
   void reset()
   {
     for (auto &a : agents) a->partners.clear();
     iteration = 1;
   }
+
+  /* Rank the suitability of a partnership. Used as the quality
+     measure when comparing partner matching algorithms.
+  */
 
   unsigned
   find_partner_rank(Agent *agent)
@@ -171,6 +194,11 @@ public:
     }
     return position;
   }
+
+  /* Given two iterators into the agent vector, finds
+     the most suitable partner to the element pointed
+     to by the from iterator, but before the to iterator.
+   */
 
   std::vector<Agent *>::iterator
   closest_pair_match(std::vector<Agent *>::iterator from,
@@ -191,6 +219,8 @@ public:
     return closest_agent;
   }
 
+  /* Same as above but looks at most min(n, to-from) entries.
+   */
   std::vector<Agent *>::iterator
   closest_pair_match_n(std::vector<Agent *>::iterator from,
 		       std::vector<Agent *>::iterator to,
@@ -213,6 +243,8 @@ public:
     return closest_agent;
   }
 
+  /* Reference partner matching algorithm: Brute force.
+   */
   void
   brute_force_match()
   {
@@ -228,6 +260,8 @@ public:
     }
   }
 
+  /* Reference partner matching algorithm: Random match. */
+
   void random_match()
   {
     std::shuffle(agents.begin(), agents.end(), initial_vals.rng);
@@ -237,6 +271,8 @@ public:
       (* (it + 1) )->partners.push_back(*it);
     }
   }
+
+  /* Random match k algorithm. */
 
   void random_match_n(unsigned neighbors)
   {
@@ -255,6 +291,8 @@ public:
     }
   }
 
+
+  /* Weighted shuffle algorithm. */
   void weighted_shuffle_match(unsigned neighbors)
   {
     std::uniform_real_distribution<double> uni;
@@ -274,6 +312,8 @@ public:
       }
     }
   }
+
+  /* Cluster shuffle algorithm. */
 
   void
   cluster_shuffle_match(unsigned clusters,
@@ -301,6 +341,8 @@ public:
       }
     }
   }
+
+  /* Statistical and timing functions. */
 
   double
   calc_avg_match()
