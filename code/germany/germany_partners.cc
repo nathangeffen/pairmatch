@@ -366,15 +366,15 @@ static void report_csv(const char *filename, const AgentVector& agents)
   fout << "id, age, sex, sexor, rel, pid, page, psex, psexor, page1"
 	    << std::endl;
   for (auto & agent: agents) {
-    fout << agent->id << ", "
-	 << agent->age << ", "
-	 << agent->sex << ", "
-	 << agent->sexor << ", "
-	 << agent->rel << ", "
-	 << ((agent->partner) ? agent->partner->id : 0) << ", "
-	 << ((agent->partner) ? round(agent->partner->age) : 0) << ", "
-	 << ((agent->partner) ? round(agent->partner->sex) : 0) << ", "
-	 << ((agent->partner) ? round(agent->partner->sexor) : 0) << ", "
+    fout << agent->id << ","
+	 << agent->age << ","
+	 << agent->sex << ","
+	 << agent->sexor << ","
+	 << agent->rel << ","
+	 << ((agent->partner) ? agent->partner->id : 0) << ","
+	 << ((agent->partner) ? round(agent->partner->age) : 0) << ","
+	 << ((agent->partner) ? round(agent->partner->sex) : 0) << ","
+	 << ((agent->partner) ? round(agent->partner->sexor) : 0) << ","
 	 << agent->desired_age << std::endl;
   }
   fout.close();
@@ -399,12 +399,12 @@ static void report_stats(const char *report_name,
   }
   double success_rate = (double)
     agents_successfully_matched / agents_to_be_matched ;
-  std::cout << report_name << ", " << report_num << ", "
-	    << parameters.at("neighbors")  << ", "
-	    << parameters.at("clusters")  << ", "
-	    << agents_to_be_matched << ", "
-	    << agents_successfully_matched << ", "
-	    << success_rate << ", "
+  std::cout << report_name << "," << report_num << ","
+	    << parameters.at("neighbors")  << ","
+	    << parameters.at("clusters")  << ","
+	    << agents_to_be_matched << ","
+	    << agents_successfully_matched << ","
+	    << success_rate << ","
 	    << time_taken << std::endl;
 }
 
@@ -420,6 +420,7 @@ void run_tests(ParameterMap& parameters,
   std::string csv_file_name;
   unsigned neighbors = parameters["neighbors"];
   unsigned clusters = parameters["clusters"];
+  unsigned varyt = parameters["varyt"];
   read_in_csv_file(input_file, agents);
   std::cout << "alg,run,k,c,tomatch,success,rate,time"
 	    << std::endl;
@@ -468,8 +469,10 @@ void run_tests(ParameterMap& parameters,
       report_stats(algorithm_name, i, agents, time_taken, parameters);
       if (parameters.at("varyk") > 0.0)
 	parameters["neighbors"] += parameters.at("varyk");
-      if (parameters.at("varyc") > 0.0)
-	parameters["clusters"] += parameters.at("varyc");
+      if (varyt == 0 || i % varyt == 0) {
+	if (parameters.at("varyc") > 0.0)
+	  parameters["clusters"] += parameters.at("varyc");
+      }
     }
   }
   destroy_agents(agents);
@@ -512,13 +515,14 @@ int main(int argc, char *argv[])
   bool csv_output = false;
   unsigned varyk = 0;
   unsigned varyc = 0;
+  unsigned varyt = 0;
   unsigned k = 350;
   unsigned clusters = 100;
 
   if (cmdOptionExists(argv, argv + argc, "-h")) {
     std::cout << argv[0] << " options, where options are:\n"
 	      << " [-i input file name]\n"
-	      << "    (if this option isn't specified, agent_list.csv is used)\n"
+	      << "    (if this isn't specified, input_agents.csv is used)\n"
 	      << " [-s random seed integer]\n"
 	      << " [-a ([R][K][W][C][D])+] \n"
 	      << "    where:\n"
@@ -529,11 +533,14 @@ int main(int argc, char *argv[])
 	      << "    D = Distribution matching\n"
 	      << " [-r number of times each algorithm must be run]\n"
 	      << " [-k number of neighbours to search for some algorithms]\n"
+	      << "     (default if left out is 350)\n"
 	      << " [-c number of clusters for Cluster shuffle algorithm]\n"
+	      << "     (default if left out is 100)\n"
 	      << " [-vk number to add to k on each run]\n"
 	      << " [-vc number to add to clusters on each run]\n"
-	      << " [-o] writes CSV output files containing all agents"
-	      << std::endl;
+	      << " [-vt vary k every run and clusters every specified run]\n"
+	      << " [-o] writes CSV output files containing all agents\n"
+	      << " [-h] displays this message\n";
     exit(1);
   }
 
@@ -544,6 +551,7 @@ int main(int argc, char *argv[])
   const char *neighbors_str = getCmdOption(argv, argv + argc, "-k");
   const char *varyk_str = getCmdOption(argv, argv + argc, "-vk");
   const char *varyc_str = getCmdOption(argv, argv + argc, "-vc");
+  const char *varyt_str = getCmdOption(argv, argv + argc, "-vt");
   const char *clusters_str = getCmdOption(argv, argv + argc, "-c");
   if (cmdOptionExists(argv, argv + argc, "-o")) csv_output = true;
 
@@ -563,6 +571,11 @@ int main(int argc, char *argv[])
     parameters["varyc"] =  (double) std::stol(std::string(varyc_str));
   else
     parameters["varyc"] =  (double) varyc;
+  if (varyt_str)
+    parameters["varyt"] =  (double) std::stol(std::string(varyt_str));
+  else
+    parameters["varyt"] =  (double) varyt;
+
 
   if (clusters_str)
     parameters["clusters"] =  (double) std::stol(std::string(clusters_str));
