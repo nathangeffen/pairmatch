@@ -469,7 +469,7 @@ void run_tests(ParameterMap& parameters,
       report_stats(algorithm_name, i, agents, time_taken, parameters);
       if (parameters.at("varyk") > 0.0)
 	parameters["neighbors"] += parameters.at("varyk");
-      if (varyt == 0 || i % varyt == 0) {
+      if (varyt == 0 || (i + 1) % varyt == 0) {
 	if (parameters.at("varyc") > 0.0)
 	  parameters["clusters"] += parameters.at("varyc");
       }
