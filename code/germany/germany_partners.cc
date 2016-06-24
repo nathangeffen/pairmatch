@@ -22,7 +22,7 @@ std::mt19937 rng;
 #define WANTS_TO_BE_SINGLE 0
 #define WANTS_TO_BE_PARTNERED 1
 #define NUM_RELS 2
-#define NUM_AGES 100
+#define NUM_AGES 101
 #define NUM_SEXES 2
 #define NUM_ORIENTATIONS 2
 
@@ -155,8 +155,8 @@ static bool check_for_partial_match(const Agent *a, const Agent *b)
 
 static bool check_for_match(const Agent *a, const Agent *b)
 {
-  if (a->partner == false &&
-      b->partner == false) {
+  if (a->partner == NULL &&
+      b->partner == NULL) {
     return check_for_partial_match(a, b);
   }
   return false;
@@ -181,6 +181,16 @@ static void check_for_errors(const AgentVector& agents)
     if (agent->partner && !check_for_partial_match(agent, agent->partner)) {
       ++errors;
       std::cout << "ERROR - Mismatched partnership: "
+		<< agent->id << " - " << agent->partner->id << std::endl;
+    }
+    if (agent->partner && !agent->partner->partner) {
+      ++errors;
+      std::cout << "ERROR - One way match: "
+		<< agent->id << " - " << agent->partner->id << std::endl;
+    }
+    if (agent->partner && agent->partner && agent->partner->partner != agent) {
+      ++errors;
+      std::cout << "ERROR - Cuckolded: "
 		<< agent->id << " - " << agent->partner->id << std::endl;
     }
   }
@@ -334,6 +344,7 @@ distribution_match(AgentVector& agents, const ParameterMap& parameters)
   }
   // Now match - O(n)
   for (auto & agent: agents) {
+    if (agent->partner) continue;
     // Calculate the start and end indices
     size_t rel = agent->rel;
     size_t age = agent->page;
@@ -344,7 +355,8 @@ distribution_match(AgentVector& agents, const ParameterMap& parameters)
       std::min(start_index + table[rel][age][sex][sexor].entries, agents.size());
     for (size_t i = start_index; (i < last_index) && (i < (start_index + k));
 	 ++i) {
-      if (agent == copy_agents[i]) continue; // Can't partner yourself
+      if (agent == copy_agents[i])
+	continue; // Ignore if partnered and can't partner yourself
       if (check_for_match(agent, copy_agents[i])) {
 	make_partner(agent, copy_agents[i]);
 	// Swap with the last entry in this part of the table
