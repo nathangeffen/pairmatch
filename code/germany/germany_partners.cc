@@ -299,6 +299,7 @@ struct Table {
 void
 distribution_match(AgentVector& agents, const ParameterMap& parameters)
 {
+  unsigned counter = 0, match_attempts = 0;
   // We are going to match at most k neighbours
   unsigned k = parameters.at("neighbors");
 
@@ -353,8 +354,9 @@ distribution_match(AgentVector& agents, const ParameterMap& parameters)
     size_t start_index = table[rel][age][sex][sexor].start;
     size_t last_index =
       std::min(start_index + table[rel][age][sex][sexor].entries, agents.size());
+    ++match_attempts;
     for (size_t i = start_index; (i < last_index) && (i < (start_index + k));
-	 ++i) {
+	 ++i, ++counter) {
       if (agent == copy_agents[i])
 	continue; // Ignore if partnered and can't partner yourself
       if (check_for_match(agent, copy_agents[i])) {
@@ -366,6 +368,7 @@ distribution_match(AgentVector& agents, const ParameterMap& parameters)
       }
     }
   }
+  std::cout << "D0: " << counter << " " << match_attempts << "\n";
 }
 
 /* Reporting */
@@ -462,7 +465,7 @@ void run_tests(ParameterMap& parameters,
       std::cerr << "Unrecognised algorithm code: " << c << std::endl;
       exit(1);
     }
-    // Resent k size and clusters before new algorithm
+    // Reset k size and clusters before new algorithm
     parameters["neighbors"] = neighbors;
     parameters["clusters"] = clusters;
     for (unsigned i = 0; i < number_of_runs; ++i) {
@@ -482,8 +485,12 @@ void run_tests(ParameterMap& parameters,
       if (parameters.at("varyk") > 0.0)
 	parameters["neighbors"] += parameters.at("varyk");
       if (varyt == 0 || (i + 1) % varyt == 0) {
-	if (parameters.at("varyc") > 0.0)
+	if (parameters.at("varyc") > 0.0) {
 	  parameters["clusters"] += parameters.at("varyc");
+	  if (varyt > 0) {
+	    parameters["neighbors"] = neighbors;
+	  }
+	}
       }
     }
   }
