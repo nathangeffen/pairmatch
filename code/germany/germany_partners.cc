@@ -299,7 +299,6 @@ struct Table {
 void
 distribution_match(AgentVector& agents, const ParameterMap& parameters)
 {
-  unsigned counter = 0, match_attempts = 0;
   // We are going to match at most k neighbours
   unsigned k = parameters.at("neighbors");
 
@@ -354,9 +353,8 @@ distribution_match(AgentVector& agents, const ParameterMap& parameters)
     size_t start_index = table[rel][age][sex][sexor].start;
     size_t last_index =
       std::min(start_index + table[rel][age][sex][sexor].entries, agents.size());
-    ++match_attempts;
     for (size_t i = start_index; (i < last_index) && (i < (start_index + k));
-	 ++i, ++counter) {
+	 ++i) {
       if (agent == copy_agents[i])
 	continue; // Ignore if partnered and can't partner yourself
       if (check_for_match(agent, copy_agents[i])) {
@@ -368,7 +366,6 @@ distribution_match(AgentVector& agents, const ParameterMap& parameters)
       }
     }
   }
-  std::cout << "D0: " << counter << " " << match_attempts << "\n";
 }
 
 /* Reporting */
