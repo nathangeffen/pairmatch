@@ -13,7 +13,7 @@ partners <- read.csv(paste(path, "partners.csv", sep=""), header=T)
 
 ### DETERMINE GENERAL PARAMETERS
 N <- dim(partners)[1] # Number of Age Groups in partner dataset
-X <- 1000000 # Number of agents to be simulated
+X <- as.integer(commandArgs()[6]) # Number of agents to be simulated
 S <- round(X*sum(data$femratio*(1-data$relw_share)*data$ageshare + (1-data$femratio)*(1-data$relm_share)*data$ageshare)) # Calculate number of single agents
 set.seed(5)
 

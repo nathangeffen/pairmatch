@@ -1,0 +1,5 @@
+alg,run,k,c,tomatch,success,rate,time
+Cluster,0,350,100,53151362,44389186,0.835147,66.5132
+Distribution,0,350,100,53151362,887074,0.0166896,116.42
+572.37user 181.16system 12:33.87elapsed 99%CPU (0avgtext+0avgdata 5671904maxresident)k
+0inputs+9662744outputs (0major+1266810minor)pagefaults 0swaps
