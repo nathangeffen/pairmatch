@@ -3,4 +3,12 @@
 *-dev
 *-rel
 *.csv
+.*
+.Rproj.user
+*~
+*.png
+*.eps
+a.out
+*.old
+*.Rproj
 
