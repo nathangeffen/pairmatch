@@ -73,3 +73,5 @@ wait
 ./germany_partners-rel -i agent_input_1000000.csv -s $RANDOM -k 100 -vk 100 -r 50 -a D >output_var_D_1000000.csv &
 
 wait
+
+Rscript analyse_output.R
