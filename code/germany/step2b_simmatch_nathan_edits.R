@@ -19,10 +19,10 @@ set.seed(5)
 
 
 ### MATRICES OF AGE DIFFERENCES
-mat.mm <- read.csv2(paste(path, "imm.msm.csv", sep=""), header=F)
-mat.ww <- read.csv2(paste(path, "imm.wsw.csv", sep=""), header=F)
-mat.mw <- read.csv2(paste(path, "imm.msw.csv", sep=""), header=F)
-mat.wm <- read.csv2(paste(path, "imm.wsm.csv", sep=""), header=F)
+mat.mm <- read.csv(paste(path, "imm.msm.csv", sep=""), header=F)
+mat.ww <- read.csv(paste(path, "imm.wsw.csv", sep=""), header=F)
+mat.mw <- read.csv(paste(path, "imm.msw.csv", sep=""), header=F)
+mat.wm <- read.csv(paste(path, "imm.wsm.csv", sep=""), header=F)
 
 ### TAKE TIME
 tic <- Sys.time()
