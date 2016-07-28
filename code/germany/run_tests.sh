@@ -1,30 +1,40 @@
 #!/bin/bash
 
+# To skip recreation of all agent input files, run this script as:
+# $ ./run_tests skip
+
 # Stop on error
+set -v
+set -x
 set -e
+
+echo "Arguments:" $0 $1
 
 # Create input files
 
-Rscript step2b_simmatch_nathan_edits.R 10000
-mv agent_list.csv agent_input_10000.csv
+if [ "$1" != "skip" ]
+    then
+    Rscript step2b_simmatch_nathan_edits.R 10000
+    mv agent_list.csv agent_input_10000.csv
 
-Rscript step2b_simmatch_nathan_edits.R 50000
-mv agent_list.csv agent_input_50000.csv
+    Rscript step2b_simmatch_nathan_edits.R 50000
+    mv agent_list.csv agent_input_50000.csv
 
-Rscript step2b_simmatch_nathan_edits.R 100000
-mv agent_list.csv agent_input_100000.csv
+    Rscript step2b_simmatch_nathan_edits.R 100000
+    mv agent_list.csv agent_input_100000.csv
 
-Rscript step2b_simmatch_nathan_edits.R 250000
-mv agent_list.csv agent_input_250000.csv
+    Rscript step2b_simmatch_nathan_edits.R 250000
+    mv agent_list.csv agent_input_250000.csv
 
-Rscript step2b_simmatch_nathan_edits.R 500000
-mv agent_list.csv agent_input_500000.csv
+    Rscript step2b_simmatch_nathan_edits.R 500000
+    mv agent_list.csv agent_input_500000.csv
 
-Rscript step2b_simmatch_nathan_edits.R 750000
-mv agent_list.csv agent_input_750000.csv
+    Rscript step2b_simmatch_nathan_edits.R 750000
+    mv agent_list.csv agent_input_750000.csv
 
-Rscript step2b_simmatch_nathan_edits.R 1000000
-mv agent_list.csv agent_input_1000000.csv
+    Rscript step2b_simmatch_nathan_edits.R 1000000
+    mv agent_list.csv agent_input_1000000.csv
+fi
 
 ./germany_partners-rel -i agent_input_10000.csv -s $RANDOM -r 30 -k 350 -c 100 >output_fixed_10000.csv &
 
