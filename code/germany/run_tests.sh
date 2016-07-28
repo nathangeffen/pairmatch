@@ -46,7 +46,7 @@ fi
 
 ./germany_partners-rel -i agent_input_500000.csv -s $RANDOM -r 30 -k 1620 -c 1700 >output_fixed_500000.csv &
 
-/germany_partners-rel -i agent_input_750000.csv -s $RANDOM -r 30 -k 2170 -c 810 >output_fixed_750000.csv &
+./germany_partners-rel -i agent_input_750000.csv -s $RANDOM -r 30 -k 2170 -c 810 >output_fixed_750000.csv &
 
 ./germany_partners-rel -i agent_input_1000000.csv -s $RANDOM -r 30 -k 2800 -c 3900 >output_fixed_1000000.csv &
 
