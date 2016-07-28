@@ -12,6 +12,7 @@ for (n in nvals) {
   k <- min(fr$k)
   bestk <- c(bestk, k)
 }
+print("Best values of k for cluster shuffle")
 print(data.frame(n=nvals,k=bestk))
 bestkcluster = bestk # Save for comparison with Distribution match
 
@@ -35,6 +36,7 @@ for (n in nvals) {
   bestc <- c(bestc, c)
 }
 
+print("Best values of c for cluster shuffle")
 print(data.frame(n=nvals,c=bestc))
 options(scipen=2)
 png('2_plotClusterShuffleBestC.png')
@@ -60,6 +62,7 @@ for (n in nvals) {
   outfr[i,] = c(k,c,n)
   i <- i + 1
 }
+print("Best values of c for best values k for cluster shuffle")
 print(outfr)
 
 options(scipen=2)
@@ -81,6 +84,7 @@ for (n in nvals) {
   k <- min(fr$k)
   bestk <- c(bestk, k)
 }
+print("Best values of k for distribution match")
 print(data.frame(n=nvals,k=bestk))
 
 options(scipen=2)
