@@ -1,0 +1,237 @@
+set -x
+set -e
++ set -e
+
+echo "Arguments:" $0 $1
++ echo Arguments: ./run_tests.sh
+Arguments: ./run_tests.sh
+
+echo "Starting time: "
++ echo 'Starting time: '
+Starting time: 
+date
++ date
+Wed Aug  3 22:11:03 CEST 2016
+
+# Create input files
+
+if [ "$1" != "skip" ]
+    then
+    Rscript step2.R 10000 1
+    mv agent_list.csv agent_input_10000.csv
+
+    Rscript step2.R 50000 1
+    mv agent_list.csv agent_input_50000.csv
+
+    Rscript step2.R 100000 1
+    mv agent_list.csv agent_input_100000.csv
+
+    Rscript step2.R 250000 1
+    mv agent_list.csv agent_input_250000.csv
+
+    Rscript step2.R 500000 1
+    mv agent_list.csv agent_input_500000.csv
+
+    Rscript step2.R 750000 1
+    mv agent_list.csv agent_input_750000.csv
+
+    Rscript step2.R 1000000 1
+    mv agent_list.csv agent_input_1000000.csv
+fi
++ '[' '' '!=' skip ']'
++ Rscript step2.R 10000 1
+During startup - Warning messages:
+1: Setting LC_CTYPE failed, using "C" 
+2: Setting LC_COLLATE failed, using "C" 
+3: Setting LC_TIME failed, using "C" 
+4: Setting LC_MONETARY failed, using "C" 
+The creation of 3406 single agents took 0.12 seconds, 
+The creation of 6593 agents in partnerships took 0.34 seconds, 
++ mv agent_list.csv agent_input_10000.csv
++ Rscript step2.R 50000 1
+During startup - Warning messages:
+1: Setting LC_CTYPE failed, using "C" 
+2: Setting LC_COLLATE failed, using "C" 
+3: Setting LC_TIME failed, using "C" 
+4: Setting LC_MONETARY failed, using "C" 
+The creation of 17035 single agents took 0.6 seconds, 
+The creation of 32964 agents in partnerships took 1.71 seconds, 
++ mv agent_list.csv agent_input_50000.csv
++ Rscript step2.R 100000 1
+During startup - Warning messages:
+1: Setting LC_CTYPE failed, using "C" 
+2: Setting LC_COLLATE failed, using "C" 
+3: Setting LC_TIME failed, using "C" 
+4: Setting LC_MONETARY failed, using "C" 
+The creation of 34071 single agents took 1.26 seconds, 
+The creation of 65928 agents in partnerships took 3.57 seconds, 
++ mv agent_list.csv agent_input_100000.csv
++ Rscript step2.R 250000 1
+During startup - Warning messages:
+1: Setting LC_CTYPE failed, using "C" 
+2: Setting LC_COLLATE failed, using "C" 
+3: Setting LC_TIME failed, using "C" 
+4: Setting LC_MONETARY failed, using "C" 
+The creation of 85178 single agents took 3.5 seconds, 
+The creation of 164821 agents in partnerships took 10.03 seconds, 
++ mv agent_list.csv agent_input_250000.csv
++ Rscript step2.R 500000 1
+During startup - Warning messages:
+1: Setting LC_CTYPE failed, using "C" 
+2: Setting LC_COLLATE failed, using "C" 
+3: Setting LC_TIME failed, using "C" 
+4: Setting LC_MONETARY failed, using "C" 
+The creation of 170358 single agents took 7.5 seconds, 
+The creation of 329641 agents in partnerships took 21.66 seconds, 
++ mv agent_list.csv agent_input_500000.csv
++ Rscript step2.R 750000 1
+During startup - Warning messages:
+1: Setting LC_CTYPE failed, using "C" 
+2: Setting LC_COLLATE failed, using "C" 
+3: Setting LC_TIME failed, using "C" 
+4: Setting LC_MONETARY failed, using "C" 
+The creation of 255537 single agents took 11.65 seconds, 
+The creation of 494462 agents in partnerships took 32.95 seconds, 
++ mv agent_list.csv agent_input_750000.csv
++ Rscript step2.R 1000000 1
+During startup - Warning messages:
+1: Setting LC_CTYPE failed, using "C" 
+2: Setting LC_COLLATE failed, using "C" 
+3: Setting LC_TIME failed, using "C" 
+4: Setting LC_MONETARY failed, using "C" 
+The creation of 340716 single agents took 15.7 seconds, 
+The creation of 659283 agents in partnerships took 44.99 seconds, 
++ mv agent_list.csv agent_input_1000000.csv
+
+./germany_partners-rel -i agent_input_10000.csv -s $RANDOM -r 30 -k 75 -c 215 >output_fixed_10000.csv &
+
+./germany_partners-rel -i agent_input_50000.csv -s $RANDOM -r 30 -k 225 -c 565 >output_fixed_50000.csv &
+
++ ./germany_partners-rel -i agent_input_10000.csv -s 21280 -r 30 -k 75 -c 215
++ ./germany_partners-rel -i agent_input_50000.csv -s 26921 -r 30 -k 225 -c 565
+./germany_partners-rel -i agent_input_250000.csv -s $RANDOM -r 30 -k 740 -c 12800 >output_fixed_250000.csv &
+
+./germany_partners-rel -i agent_input_500000.csv -s $RANDOM -r 30 -k 1620 -c 1700 >output_fixed_500000.csv &
++ ./germany_partners-rel -i agent_input_250000.csv -s 6565 -r 30 -k 740 -c 12800
+
+./germany_partners-rel -i agent_input_750000.csv -s $RANDOM -r 30 -k 2170 -c 810 >output_fixed_750000.csv &
++ ./germany_partners-rel -i agent_input_500000.csv -s 359 -r 30 -k 1620 -c 1700
+
+./germany_partners-rel -i agent_input_1000000.csv -s $RANDOM -r 30 -k 2800 -c 3900 >output_fixed_1000000.csv &
+
+wait
++ wait
++ ./germany_partners-rel -i agent_input_1000000.csv -s 25681 -r 30 -k 2800 -c 3900
++ ./germany_partners-rel -i agent_input_100000.csv -s 19218 -r 30 -k 330 -c 1130
++ ./germany_partners-rel -i agent_input_750000.csv -s 25949 -r 30 -k 2170 -c 810
+
+./germany_partners-rel -i agent_input_10000.csv -s $RANDOM -k 5 -c 5 -vk 10 -vc 10 -vt 30 -r 900 -a C >output_var_C_10000.csv &
+
+./germany_partners-rel -i agent_input_50000.csv -s $RANDOM -k 5 -c 5 -vk 20 -vc 20 -vt 30 -r 900 -a C >output_var_C_50000.csv &
+
+./germany_partners-rel -i agent_input_100000.csv -s $RANDOM -k 50 -c 50 -vk 40 -vc 40 -vt 30 -r 900 -a C >output_var_C_100000.csv &
++ ./germany_partners-rel -i agent_input_10000.csv -s 11445 -k 5 -c 5 -vk 10 -vc 10 -vt 30 -r 900 -a C
+
+./germany_partners-rel -i agent_input_250000.csv -s $RANDOM -k 80 -c 80 -vk 60 -vc 60 -vt 30 -r 900 -a C >output_var_C_250000.csv &
+
+./germany_partners-rel -i agent_input_500000.csv -s $RANDOM -k 100 -c 100 -vk 80 -vc 80 -vt 30 -r 900 -a C >output_var_C_500000.csv &
++ ./germany_partners-rel -i agent_input_50000.csv -s 28420 -k 5 -c 5 -vk 20 -vc 20 -vt 30 -r 900 -a C
+
+./germany_partners-rel -i agent_input_750000.csv -s $RANDOM -k 90 -c 90 -vk 90 -vc 90 -vt 35 -r 1225 -a C >output_var_C_750000.csv &
+
+./germany_partners-rel -i agent_input_1000000.csv -s $RANDOM -k 100 -c 100 -vk 100 -vc 100 -vt 40 -r 1600 -a C >output_var_C_1000000.csv &
++ ./germany_partners-rel -i agent_input_100000.csv -s 29434 -k 50 -c 50 -vk 40 -vc 40 -vt 30 -r 900 -a C
+
+wait
++ wait
++ ./germany_partners-rel -i agent_input_250000.csv -s 23860 -k 80 -c 80 -vk 60 -vc 60 -vt 30 -r 900 -a C
++ ./germany_partners-rel -i agent_input_500000.csv -s 26566 -k 100 -c 100 -vk 80 -vc 80 -vt 30 -r 900 -a C
++ ./germany_partners-rel -i agent_input_750000.csv -s 4964 -k 90 -c 90 -vk 90 -vc 90 -vt 35 -r 1225 -a C
++ ./germany_partners-rel -i agent_input_1000000.csv -s 20247 -k 100 -c 100 -vk 100 -vc 100 -vt 40 -r 1600 -a C
+
+./germany_partners-rel -i agent_input_10000.csv -s $RANDOM -k 5 -vk 10 -r 50 -a D >output_var_D_10000.csv &
+
+./germany_partners-rel -i agent_input_50000.csv -s $RANDOM -k 5 -vk 20 -r 50 -a D >output_var_D_50000.csv &
+
+./germany_partners-rel -i agent_input_100000.csv -s $RANDOM -k 50 -vk 40 -r 50 -a D >output_var_D_100000.csv &
+
+./germany_partners-rel -i agent_input_250000.csv -s $RANDOM -k 80 -vk 60 -r 50 -a D >output_var_D_250000.csv &
++ ./germany_partners-rel -i agent_input_50000.csv -s 20968 -k 5 -vk 20 -r 50 -a D
+
+./germany_partners-rel -i agent_input_500000.csv -s $RANDOM -k 100 -vk 80 -r 50 -a D >output_var_D_500000.csv &
++ ./germany_partners-rel -i agent_input_250000.csv -s 26102 -k 80 -vk 60 -r 50 -a D
+
+./germany_partners-rel -i agent_input_750000.csv -s $RANDOM -k 100 -vk 90 -r 50 -a D >output_var_D_750000.csv &
++ ./germany_partners-rel -i agent_input_100000.csv -s 13638 -k 50 -vk 40 -r 50 -a D
+
+./germany_partners-rel -i agent_input_1000000.csv -s $RANDOM -k 100 -vk 100 -r 50 -a D >output_var_D_1000000.csv &
+
+wait
++ wait
++ ./germany_partners-rel -i agent_input_1000000.csv -s 1494 -k 100 -vk 100 -r 50 -a D
++ ./germany_partners-rel -i agent_input_750000.csv -s 23096 -k 100 -vk 90 -r 50 -a D
++ ./germany_partners-rel -i agent_input_500000.csv -s 24672 -k 100 -vk 80 -r 50 -a D
+
+Rscript analyse_output.R
++ Rscript analyse_output.R
+During startup - Warning messages:
+1: Setting LC_CTYPE failed, using "C" 
+2: Setting LC_COLLATE failed, using "C" 
+3: Setting LC_TIME failed, using "C" 
+4: Setting LC_MONETARY failed, using "C" 
+[1] "Best values of k for cluster shuffle"
+        n    k
+1   10000   95
+2   50000  385
+3  100000  650
+4  250000 1340
+5  500000 2260
+6  750000 3150
+7 1000000 3700
+null device 
+          1 
+[1] "Best values of c for cluster shuffle"
+        n    c
+1   10000   65
+2   50000  165
+3  100000  170
+4  250000  320
+5  500000  820
+6  750000 1170
+7 1000000  700
+null device 
+          1 
+[1] "Best values of c for best values k for cluster shuffle"
+     k    c       n
+1   95  205   10000
+2  385  325   50000
+3  650  730  100000
+4 1340 1760  250000
+5 2260 2420  500000
+6 3150 1170  750000
+7 3700 3000 1000000
+null device 
+          1 
+[1] "Best values of k for distribution match"
+        n    k
+1   10000   45
+2   50000  185
+3  100000  370
+4  250000  860
+5  500000 1700
+6  750000 2530
+7 1000000 3300
+null device 
+          1 
+The following objects are masked _by_ .GlobalEnv:
+
+    c, k
+null device 
+          1 
+
+echo "Ending at:"
++ echo 'Ending at:'
+Ending at:
+date
++ date
+Wed Aug  3 22:30:35 CEST 2016
