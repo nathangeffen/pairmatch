@@ -17,7 +17,7 @@ date
 
 if [ "$1" != "skip" ]
     then
-    Rscript step2b.R 10000 1
+    Rscript step2.R 10000 1
     mv agent_list.csv agent_input_10000.csv
 
     Rscript step2.R 50000 1
