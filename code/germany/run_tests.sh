@@ -10,29 +10,32 @@ set -e
 
 echo "Arguments:" $0 $1
 
+echo "Starting time: "
+date
+
 # Create input files
 
 if [ "$1" != "skip" ]
     then
-    Rscript step2b_simmatch_nathan_edits.R 10000
+    Rscript step2b.R 10000 1
     mv agent_list.csv agent_input_10000.csv
 
-    Rscript step2b_simmatch_nathan_edits.R 50000
+    Rscript step2.R 50000 1
     mv agent_list.csv agent_input_50000.csv
 
-    Rscript step2b_simmatch_nathan_edits.R 100000
+    Rscript step2.R 100000 1
     mv agent_list.csv agent_input_100000.csv
 
-    Rscript step2b_simmatch_nathan_edits.R 250000
+    Rscript step2.R 250000 1
     mv agent_list.csv agent_input_250000.csv
 
-    Rscript step2b_simmatch_nathan_edits.R 500000
+    Rscript step2.R 500000 1
     mv agent_list.csv agent_input_500000.csv
 
-    Rscript step2b_simmatch_nathan_edits.R 750000
+    Rscript step2.R 750000 1
     mv agent_list.csv agent_input_750000.csv
 
-    Rscript step2b_simmatch_nathan_edits.R 1000000
+    Rscript step2.R 1000000 1
     mv agent_list.csv agent_input_1000000.csv
 fi
 
@@ -85,3 +88,6 @@ wait
 wait
 
 Rscript analyse_output.R
+
+echo "Ending at:"
+date

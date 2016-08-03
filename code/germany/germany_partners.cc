@@ -83,6 +83,10 @@ static void read_in_csv_file(const char* filename,
       if (line == 1) continue;
       Agent* agent = new Agent();
       if (!std::getline( ss, s, ',' )) break;
+      if (s == "NA") {
+	std::getline( infile, s );
+	break;
+      }
       agent->id = stol(s);
       if (!std::getline( ss, s, ',' )) break;
       agent->age = stol(s);
@@ -123,7 +127,8 @@ static void read_in_csv_file(const char* filename,
 
   if (!infile.eof())
   {
-    std::cerr << "Error occurred on line: " << line << std::endl;
+    std::cerr << "Should have reached end of file but didn't at line: " << line << std::endl;
+    std::cerr << "Failbit: " << infile.fail() << std::endl;
     exit(1);
   }
 }
@@ -434,6 +439,7 @@ void run_tests(ParameterMap& parameters,
   unsigned clusters = parameters["clusters"];
   unsigned varyt = parameters["varyt"];
   read_in_csv_file(input_file, agents);
+  shuffle(agents.begin(), agents.end(), rng);
   std::cout << "alg,run,k,c,tomatch,success,rate,time"
 	    << std::endl;
   for (auto & c: algorithms_to_run) {
