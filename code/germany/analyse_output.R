@@ -3,6 +3,7 @@
 nvals = c(10000,50000,100000,250000,500000,750000,1000000)
 
 bestk = c()
+bestrate = c()
 for (n in nvals) {
   filename = paste("output_var_C_", format(n, scientific=FALSE), ".csv", sep="")
   fr <- read.csv(filename)
@@ -11,9 +12,10 @@ for (n in nvals) {
   fr <- fr[L,]
   k <- min(fr$k)
   bestk <- c(bestk, k)
+  bestrate <- c(bestrate, m)
 }
 print("Best values of k for cluster shuffle")
-print(data.frame(n=nvals,k=bestk))
+print(data.frame(n=nvals,k=bestk,rate=bestrate))
 bestkcluster = bestk # Save for comparison with Distribution match
 
 options(scipen=2)
@@ -26,6 +28,7 @@ dev.off()
 # Cluster shuffle: Determine best c for each value of n (number of agents) and generate plot
 
 bestc = c()
+bestrate = c()
 for (n in nvals) {
   filename = paste("output_var_C_", format(n, scientific=FALSE), ".csv", sep="")
   fr <- read.csv(filename)
@@ -34,10 +37,11 @@ for (n in nvals) {
   fr <- fr[L,]
   c <- min(fr$c)
   bestc <- c(bestc, c)
+  bestrate <- c(bestrate, m)
 }
 
 print("Best values of c for cluster shuffle")
-print(data.frame(n=nvals,c=bestc))
+print(data.frame(n=nvals,c=bestc,rate=bestrate))
 options(scipen=2)
 png('2_plotClusterShuffleBestC.png')
 plot(nvals, bestc, type="b", main="Cluster shuffle", sub="Best number of clusters for number of agents",
@@ -46,7 +50,7 @@ dev.off()
 
 # Cluster shuffle: Determine lowest c at best value of k and generate plot
 l = length(nvals)
-outfr = data.frame(k=1:l,c=1:l,n=1:l)
+outfr = data.frame(k=1:l,c=1:l,rate=1:l,n=1:l)
 i = 1
 for (n in nvals) {
   filename = paste("output_var_C_", format(n, scientific=FALSE), ".csv", sep="")
@@ -59,7 +63,7 @@ for (n in nvals) {
   fr <- fr[L,]
   c = min(fr$c)
   row = c(k,c,n)
-  outfr[i,] = c(k,c,n)
+  outfr[i,] = c(k,c,rate=m,n)
   i <- i + 1
 }
 print("Best values of c for best values k for cluster shuffle")
@@ -75,6 +79,7 @@ dev.off()
 # Distribution v Cluster: Determine best k for each value of n (number of agents) and generate plot
 
 bestk = c()
+bestrate = c()
 for (n in nvals) {
   filename = paste("output_var_D_", format(n, scientific=FALSE), ".csv", sep="")
   fr <- read.csv(filename)
@@ -83,9 +88,10 @@ for (n in nvals) {
   fr <- fr[L,]
   k <- min(fr$k)
   bestk <- c(bestk, k)
+  bestrate <- c(bestrate, m)
 }
 print("Best values of k for distribution match")
-print(data.frame(n=nvals,k=bestk))
+print(data.frame(n=nvals,k=bestk,rate=bestrate))
 
 options(scipen=2)
 png('4_plotClusterShuffleVsDistributionBestK.png')
