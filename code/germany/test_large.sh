@@ -11,8 +11,15 @@ set -e
 echo "Starting time: "
 date
 
-./germany_partners-rel -i agent_input_80620000.csv -s $RANDOM -k 30000 -c 10000 -a CD >output_fixed_80620000.csv
+./germany_partners-rel -i agent_input_80620000.csv -s $RANDOM -k 30000 -c 10000 -a C >output_fixed_C_80620000_k_30000_c_10000.csv &
 
+./germany_partners-rel -i agent_input_80620000.csv -s $RANDOM -k 30000 -a D >output_fixed_D_80620000_k_30000.csv &
+
+./germany_partners-rel -i agent_input_80620000.csv -s $RANDOM -k 50000 -c 20000 -a C >output_fixed_C_80620000_k_50000_c_20000.csv &
+
+./germany_partners-rel -i agent_input_80620000.csv -s $RANDOM -k 50000 -a D >output_fixed_D_80620000_k_50000.csv &
+
+wait
 
 echo "Ending at:"
 date
