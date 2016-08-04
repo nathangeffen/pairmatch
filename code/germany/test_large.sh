@@ -19,6 +19,8 @@ date
 
 ./germany_partners-rel -i agent_input_80620000.csv -s $RANDOM -k 45000 -c 6000 -a C >output_fixed_C_80620000_k_45000_c_6000.csv &
 
+wait
+
 ./germany_partners-rel -i agent_input_80620000.csv -s $RANDOM -k 45000 -c 8000 -a C >output_fixed_C_80620000_k_45000_c_8000.csv &
 
 ./germany_partners-rel -i agent_input_80620000.csv -s $RANDOM -k 45000 -c 10000 -a C >output_fixed_C_80620000_k_45000_c_10000.csv &
