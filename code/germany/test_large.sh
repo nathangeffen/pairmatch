@@ -11,7 +11,7 @@ set -e
 echo "Starting time: "
 date
 
-./germany_partners-rel -i agent_input_80620000.csv -s $RANDOM -k 10000 -c 5000 -a DC >output_fixed_1000000.csv
+./germany_partners-rel -i agent_input_80620000.csv -s $RANDOM -k 30000 -c 10000 -a CD >output_fixed_80620000.csv
 
 
 echo "Ending at:"
