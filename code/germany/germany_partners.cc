@@ -10,13 +10,14 @@
 #include <unordered_map>
 #include <vector>
 
+#include "CSV_Parser.hh"
+#include "sample.hh"
 #include "stats.hh"
 
 std::mt19937 rng;
 
-
-#define MALE 0
-#define FEMALE 1
+#define FEMALE 0
+#define MALE 1
 #define HETEROSEXUAL 0
 #define HOMOSEXUAL 1
 #define WANTS_TO_BE_SINGLE 0
@@ -142,6 +143,13 @@ void clear_partners(AgentVector& agents)
 
 /* Auxiliary matching functions */
 
+void print_vector(const std::vector<double> vec)
+{
+  for (auto& d: vec)
+    std::cout << d << " ";
+  std::cout << std::endl;
+}
+
 static bool check_for_partial_match(const Agent *a, const Agent *b)
 {
   if (a->rel == WANTS_TO_BE_PARTNERED &&
@@ -233,6 +241,282 @@ void find_partner(AgentVector& agents, const unsigned k)
 
 /* Matching Algorithms */
 
+
+/* Supporting functions for Stefan's initial population creation algorithm. */
+
+
+
+std::vector<double> get_col(const DblMatrix& matrix, unsigned col)
+{
+  std::vector<double> output;
+  for (unsigned i = 0; i < matrix.size(); ++i)
+    output.push_back(matrix[i][col]);
+  return output;
+}
+
+std::vector<double> sub_vector(double d,
+			       const std::vector<double>& v)
+{
+  std::vector<double> output;
+  for (size_t i = 0; i < v.size(); ++i)
+    output.push_back(d - v[i]);
+  return output;
+}
+
+std::vector<double> mult_vector(double d,
+				const std::vector<double>& v)
+{
+  std::vector<double> output;
+  for (size_t i = 0; i < v.size(); ++i)
+    output.push_back(d * v[i]);
+  return output;
+}
+
+std::vector<double> mult_vectors(const std::vector<double>& v1,
+				 const std::vector<double>& v2)
+{
+  std::vector<double> output;
+  for (size_t i = 0; i < v1.size(); ++i)
+    output.push_back(v1[i] * v2[i]);
+  return output;
+}
+
+
+std::vector<double> add_vectors(const std::vector<double>& v1,
+				const std::vector<double>& v2)
+{
+  std::vector<double> output;
+  for (size_t i = 0; i < v1.size(); ++i)
+    output.push_back(v1[i] + v2[i]);
+  return output;
+}
+
+double sum_vector(const std::vector<double>& dbls)
+{
+  double total = 0.0;
+  for (auto d: dbls)
+    total += d;
+  return total;
+}
+
+bool check_gt_0(const std::vector<double>& dbls)
+{
+  for (auto& d: dbls) {
+    if (d > 0.0)
+      return true;
+  }
+  return false;
+}
+
+double calc_number_singles(DblMatrix data, unsigned X)
+{
+  auto ageshare = get_col(data, 1);
+  auto femratio = get_col(data, 2);
+  auto relm_share = get_col(data, 3);
+  auto relw_share = get_col(data, 4);
+
+  auto t1 = sub_vector(1, relw_share);
+  auto t2 = mult_vectors(femratio, t1);
+  auto t3 = mult_vectors(t2, ageshare);
+
+  auto t4 = sub_vector(1, femratio);;
+  auto t5 = sub_vector(1, relm_share);
+  auto t6 = mult_vectors(t4, t5);
+  auto t7 = mult_vectors(t6, ageshare);
+
+  auto t8 = add_vectors(t3, t7);
+  auto t9 = sum_vector(t8);
+
+  double num_agents = X * t9;
+  return round(num_agents);
+}
+
+void create_singles(AgentVector& agents,
+		    const DblMatrix& data,
+		    const unsigned S,
+		    const std::vector<double>& ageRange,
+		    const std::vector<double>& ageShare,
+		    const std::vector<double>& femRatio,
+		    const std::vector<double>& wswRate,
+		    const std::vector<double>& msmRate)
+{
+  std::uniform_real_distribution<double> uni;
+  Sample sample_ageshare(ageShare, &rng);
+  for(unsigned i = 0; i < S; ++i) {
+    Agent *agent = new Agent();
+    // ID
+    agent->id = i + 1;
+    // Age
+    unsigned age = sample_ageshare();
+    agent->age = age;
+    // Sex
+    unsigned sex = uni(rng) < femRatio[age] ? FEMALE : MALE;
+    agent->sex = sex;
+    // Sexor
+    unsigned sexor;
+    if (sex == FEMALE) {
+      sexor = uni(rng) < wswRate[age] ? HOMOSEXUAL : HETEROSEXUAL;
+    } else {
+      sexor = uni(rng) < msmRate[age] ? HOMOSEXUAL : HETEROSEXUAL;
+    }
+    agent->sexor = sexor;
+    agent->rel = 0;
+    agent->partner = NULL;
+    agent->page = 0;
+    agent->psex = 0;
+    agent->psexor = 0;
+    agent->desired_age = 0;
+    agents.push_back(agent);
+  }
+}
+
+void create_partners_ACP(AgentVector& agents,
+			 const DblMatrix& data,
+			 const unsigned fromAgent,
+			 const unsigned toAgent,
+			 const std::vector<double>& ageRange,
+			 const std::vector<double>& ageShare,
+			 const std::vector<double>& femRatio,
+			 const std::vector<double>& wswRate,
+			 const std::vector<double>& msmRate,
+			 const DblMatrix& matWW,
+			 const DblMatrix& matMW,
+			 const DblMatrix& matWM,
+			 const DblMatrix& matMM)
+{
+  std::uniform_real_distribution<double> uni;
+  Sample sample_ageshare(ageShare, &rng);
+  vector<Sample> sample_matWW(matWW.size());
+  vector<Sample> sample_matMW(matMW.size());
+  vector<Sample> sample_matWM(matWM.size());
+  vector<Sample> sample_matMM(matMM.size());
+  std::vector<double> placeholder(matMM[0].size(), 0.000001);
+
+  for (unsigned i = 0; i < matWW.size(); ++i) {
+    if (check_gt_0(matWW[i]))
+      sample_matWW[i].init(matWW[i], &rng);
+    else
+      sample_matWW[i].init(placeholder, &rng);
+
+    if (check_gt_0(matWM[i]))
+      sample_matWM[i].init(matWM[i], &rng);
+    else
+      sample_matWM[i].init(placeholder, &rng);
+
+    if (check_gt_0(matMW[i]))
+      sample_matMW[i].init(matMW[i], &rng);
+    else
+      sample_matMW[i].init(placeholder, &rng);
+
+    if (check_gt_0(matMM[i]))
+      sample_matMM[i].init(matMM[i], &rng);
+    else
+      sample_matMM[i].init(placeholder, &rng);
+  }
+  for (unsigned i = fromAgent; i + 1 < toAgent; i+=2) {
+    Agent *agent = new Agent();
+    // ID
+    agent->id = i + 1;
+    // Age
+    unsigned age = sample_ageshare() + 12;
+    agent->age = age;
+    // Sex
+    unsigned sex = uni(rng) < femRatio[age - 12] ? FEMALE : MALE;
+    agent->sex = sex;
+    // Sexor
+    unsigned sexor;
+    if (sex == FEMALE) {
+      sexor = uni(rng) < wswRate[age - 12] ? HOMOSEXUAL : HETEROSEXUAL;
+    } else {
+      sexor = uni(rng) < msmRate[age - 12] ? HOMOSEXUAL : HETEROSEXUAL;
+    }
+    agent->sexor = sexor;
+    // Relationship
+    agent->rel = 1;
+    Agent* partner = new Agent();
+    // ID of partner
+    agent->partner = partner;
+    // Partner ID
+    partner->id = i + 2;
+    // Orientation = partner's orientation
+    partner->sexor = sexor;
+    // Partner sex
+    if (sexor == HETEROSEXUAL) {
+      if (sex == MALE)
+	partner->sex = FEMALE;
+      else
+	partner->sex = MALE;
+    } else {
+      partner->sex = sex;
+    }
+    // Partner age
+    if (sex == FEMALE && sexor == HOMOSEXUAL) {
+      partner->age  = sample_matWW[age - 12]() + 12;
+    } else if (sex == FEMALE && sexor == HETEROSEXUAL) {
+      partner->age = sample_matWM[age - 12]() + 12;
+    } else if (sex == MALE && sexor == HETEROSEXUAL) {
+      partner->age = sample_matMW[age - 12]() + 12;
+    } else {
+      partner->age = sample_matMM[age - 12]() + 12;
+    }
+    // Partner in relationship
+    partner->rel = 1;
+    // Partner's partner
+    partner->partner = agent;
+    // Preferred age of partner
+    agent->page = partner->age;
+    partner->page = agent->age;
+    // Preferred partner sex
+    agent->psex = partner->sex;
+    partner->psex = agent->sex;
+    // partner sexor
+    agent->psexor = partner->sexor;
+    partner->psexor = agent->sexor;
+    agents.push_back(agent);
+    agents.push_back(partner);
+  }
+}
+
+/* Stefan's initial population creation algorithm. */
+
+void initial_pop(AgentVector& agents, const ParameterMap& parameters)
+{
+  CSVParser data_csv("data.csv", ";", true);
+  DblMatrix data = data_csv.convert_all_entries_to_doubles();
+  CSVParser singles_csv("singles.csv", ",", true);
+  DblMatrix singles = singles_csv.convert_all_entries_to_doubles();
+  CSVParser partners_csv("partnersACP.csv", ",", true);
+  DblMatrix partners = partners_csv.convert_all_entries_to_doubles();
+  CSVParser mm_csv("mat.msm.csv", ";", false);
+  DblMatrix mm = mm_csv.convert_all_entries_to_doubles();
+  CSVParser ww_csv("mat.wsw.csv", ";", false);
+  DblMatrix ww = ww_csv.convert_all_entries_to_doubles();
+  CSVParser mw_csv("mat.msw.csv", ";", false);
+  DblMatrix mw = mw_csv.convert_all_entries_to_doubles();
+  CSVParser wm_csv("mat.wsm.csv", ";", false);
+  DblMatrix wm = wm_csv.convert_all_entries_to_doubles();
+
+  unsigned X = parameters.at("agents");
+  unsigned S = calc_number_singles(data, X);
+
+
+  std::vector<double> ageRange;
+  for (unsigned i = 12; i <= 100; ++i)
+    ageRange.push_back(i);
+  auto ageShare = get_col(singles, 1);
+  auto femRatio = get_col(singles, 2);
+  auto msmRate = get_col(singles, 3);
+  auto wswRate = get_col(singles, 4);
+  create_singles(agents, data, S, ageRange, ageShare,
+		 femRatio, wswRate, msmRate);
+  ageShare = femRatio = msmRate = wswRate = {};
+  ageShare = get_col(partners, 1);
+  femRatio = get_col(partners, 2);
+  msmRate = get_col(partners, 3);
+  wswRate = get_col(partners, 4);
+  create_partners_ACP(agents, data, S, X, ageRange, ageShare, femRatio,
+  		      wswRate, msmRate, ww, mw, wm, mm);
+}
 
 /* Reference partner matching algorithm: Random match. */
 
@@ -444,6 +728,12 @@ void run_tests(ParameterMap& parameters,
 	    << std::endl;
   for (auto & c: algorithms_to_run) {
     switch(c) {
+    case 'I':
+      destroy_agents(agents);
+      agents = {};
+      algorithm = initial_pop;
+      algorithm_name = "Initialpop";
+      break;
     case 'R':
       algorithm = random_match;
       algorithm_name = "Random";
@@ -540,6 +830,7 @@ int main(int argc, char *argv[])
   unsigned varyt = 0;
   unsigned k = 350;
   unsigned clusters = 100;
+  unsigned num_agents = 100;
 
   if (cmdOptionExists(argv, argv + argc, "-h")) {
     std::cout << argv[0] << " options, where options are:\n"
@@ -548,6 +839,7 @@ int main(int argc, char *argv[])
 	      << " [-s random seed integer]\n"
 	      << " [-a ([R][K][W][C][D])+] \n"
 	      << "    where:\n"
+	      << "    I = Initial population creation matching\n"
 	      << "    R = Random matching\n"
 	      << "    K = Random k matching\n"
 	      << "    W = Weighted shuffle matching\n"
@@ -575,6 +867,7 @@ int main(int argc, char *argv[])
   const char *varyc_str = getCmdOption(argv, argv + argc, "-vc");
   const char *varyt_str = getCmdOption(argv, argv + argc, "-vt");
   const char *clusters_str = getCmdOption(argv, argv + argc, "-c");
+  const char *num_agents_str = getCmdOption(argv, argv + argc, "-n");
   if (cmdOptionExists(argv, argv + argc, "-o")) csv_output = true;
 
   if (!input_file_str) input_file_str = "input_agents.csv";
@@ -597,7 +890,10 @@ int main(int argc, char *argv[])
     parameters["varyt"] =  (double) std::stol(std::string(varyt_str));
   else
     parameters["varyt"] =  (double) varyt;
-
+  if (num_agents_str)
+    parameters["agents"] = (double) std::stol(std::string(num_agents_str));
+  else
+    parameters["agents"] = num_agents;
 
   if (clusters_str)
     parameters["clusters"] =  (double) std::stol(std::string(clusters_str));

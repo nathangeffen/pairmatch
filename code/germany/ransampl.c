@@ -10,7 +10,7 @@
  * Copyright: Joachim Wuttke, Forschungszentrum Juelich GmbH (2013)
  *
  * License:   see ../COPYING (FreeBSD)
- * 
+ *
  * Homepage:  apps.jcns.fz-juelich.de/ransampl
  */
 
@@ -23,9 +23,9 @@
 ransampl_ws* ransampl_alloc( int n )
 {
     ransampl_ws *ws;
-    if ( !(ws = malloc( sizeof(ransampl_ws) )) ||
-         !(ws->alias = malloc( n*sizeof(int) )) ||
-         !(ws->prob = malloc( n*sizeof(double) )) ) {
+    if ( !(ws = (ransampl_ws *) malloc( sizeof(ransampl_ws) )) ||
+         !(ws->alias = (int *) malloc( n*sizeof(int) )) ||
+         !(ws->prob = (double *) malloc( n*sizeof(double) )) ) {
         fprintf( stderr, "ransampl: workspace allocation failed\n" );
         exit(ENOMEM);
     }
