@@ -52,7 +52,7 @@ fi
 
 ./germany_partners-rel -s $RANDOM -a 30,IRKWCD -n 750000 -k 2170 -c 810 >output_fixed_750000.csv &
 
-./germany_partners-rel -s $RANDOM -a 30,IRKWCD -n 750000 -k 2800 -c 3900 >output_fixed_1000000.csv &
+./germany_partners-rel -s $RANDOM -a 30,IRKWCD -n 1000000 -k 2800 -c 3900 >output_fixed_1000000.csv &
 
 wait
 
