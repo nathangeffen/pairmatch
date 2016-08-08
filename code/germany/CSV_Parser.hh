@@ -40,6 +40,7 @@ public:
       std::vector<double> double_row;
       for (auto& s: r) {
 	boost::replace_all(s, ",", ".");
+	boost::replace_all(s, "NA", "0");
 	double_row.push_back(stod(s));
       }
       double_rows.push_back(double_row);

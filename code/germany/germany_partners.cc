@@ -7,6 +7,7 @@
 #include <string>
 #include <random>
 #include <ctime>
+#include <cstdio>
 #include <unordered_map>
 #include <vector>
 
@@ -42,7 +43,6 @@ struct Agent {
   unsigned page;
   unsigned psex;
   unsigned psexor;
-  unsigned desired_age;
   Agent* partner = NULL;
   double weight;
 
@@ -63,75 +63,25 @@ void destroy_agents(AgentVector& agents)
 
 
 
-static void read_in_csv_file(const char* filename,
-			     AgentVector& agents)
+static void read_agent_file(const char* filename,
+			    AgentVector& agents)
 {
-  std::ifstream infile;
-  infile.open (filename, std::ifstream::in);
-  if (infile.fail()) {
-    std::cerr << "Error opening " << filename << std::endl;
-    exit(1);
-  }
-  unsigned line = 0;
-  while (infile)
-  {
-    try {
-      ++line;
-      std::string s;
-      if (!std::getline( infile, s )) break;
-      std::istringstream ss(s);
-
-      if (line == 1) continue;
+    CSVParser agents_csv(filename, ",", true);
+    DblMatrix agent_matrix = agents_csv.convert_all_entries_to_doubles();
+    for (auto& row: agent_matrix) {
       Agent* agent = new Agent();
-      if (!std::getline( ss, s, ',' )) break;
-      if (s == "NA") {
-	std::getline( infile, s );
-	break;
-      }
-      agent->id = stol(s);
-      if (!std::getline( ss, s, ',' )) break;
-      agent->age = stol(s);
-      if (!std::getline( ss, s, ',' )) break;
-      agent->sex = stol(s);
-      if (!std::getline( ss, s, ',' )) break;
-      agent->sexor = stol(s);
-      if (!std::getline( ss, s, ',' )) break;
-      agent->rel = stol(s);
-      // pid - skip
-      if (!std::getline( ss, s, ',' )) break;
-      // page
-      if (!std::getline( ss, s, ',' )) break;
-      agent->page = stol(s);
-      // psex
-      if (!std::getline( ss, s, ',' )) break;
-      agent->psex = stol(s);
-      // psexor
-      if (!std::getline( ss, s, ',' )) break;
-      agent->psexor = stol(s);
-      if (!std::getline( ss, s)) break;
-      if (s.size() == 0 || s[0] != 'N') {
-	agent->desired_age = stol(s);
-	if (agent->desired_age != agent->page) {
-	  std::cerr << "Non-matching ages at line " << line << std::endl;
-	  exit(1);
-	}
-      } else {
-	agent->desired_age = 0;
-      }
+      // "id","age","sex","sexor","rel","pid","page","psex","psexor"
+      agent->id = row[0];
+      agent->age = row[1];
+      agent->sex = row[2];
+      agent->sexor = row[3];
+      agent->rel = row[4];
+      // skip row[5] pid
+      agent->page = row[6];
+      agent->psex = row[7];
+      agent->psexor = row[8];
       agents.push_back(agent);
-    } catch (std::exception &e) {
-      std::cerr << "Exception at line " << line << " with message: " << e.what()
-		<< std::endl;
-      exit(1);
     }
-  }
-
-  if (!infile.eof())
-  {
-    std::cerr << "Should have reached end of file but didn't at line: " << line << std::endl;
-    std::cerr << "Failbit: " << infile.fail() << std::endl;
-    exit(1);
-  }
 }
 
 void clear_partners(AgentVector& agents)
@@ -365,7 +315,6 @@ void create_singles(AgentVector& agents,
     agent->page = 0;
     agent->psex = 0;
     agent->psexor = 0;
-    agent->desired_age = 0;
     agents.push_back(agent);
   }
 }
@@ -661,24 +610,17 @@ distribution_match(AgentVector& agents, const ParameterMap& parameters)
 
 static void report_csv(const char *filename, const AgentVector& agents)
 {
-  std::ofstream fout;
-  fout.open (filename, std::ofstream::out);
-
-  fout << "id, age, sex, sexor, rel, pid, page, psex, psexor, page1"
-	    << std::endl;
-  for (auto & agent: agents) {
-    fout << agent->id << ","
-	 << agent->age << ","
-	 << agent->sex << ","
-	 << agent->sexor << ","
-	 << agent->rel << ","
-	 << ((agent->partner) ? agent->partner->id : 0) << ","
-	 << ((agent->partner) ? round(agent->partner->age) : 0) << ","
-	 << ((agent->partner) ? round(agent->partner->sex) : 0) << ","
-	 << ((agent->partner) ? round(agent->partner->sexor) : 0) << ","
-	 << agent->desired_age << std::endl;
+  FILE* fout = fopen(filename, "w");
+  fprintf(fout, "id, age, sex, sexor, rel, pid, page, psex, psexor\n");
+  for (auto& agent: agents) {
+    fprintf(fout, "%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
+	    agent->id, agent->age, agent->sex, agent->sexor, agent->rel,
+	    ((agent->partner) ? agent->partner->id : 0),
+	    ((agent->partner) ? agent->partner->age : 0),
+	    ((agent->partner) ? agent->partner->sex : 0),
+	    ((agent->partner) ? agent->partner->sexor : 0));
   }
-  fout.close();
+  fclose(fout);
 }
 
 
@@ -716,14 +658,17 @@ void run_tests(ParameterMap& parameters,
 	       const bool csv_output)
 {
   AgentVector agents;
+  unsigned j = 0;
   std::function<void(AgentVector &, const ParameterMap)> algorithm;
   const char* algorithm_name;
   std::string csv_file_name;
-  unsigned neighbors = parameters["neighbors"];
-  unsigned clusters = parameters["clusters"];
-  unsigned varyt = parameters["varyt"];
-  read_in_csv_file(input_file, agents);
-  shuffle(agents.begin(), agents.end(), rng);
+  unsigned neighbors = parameters.at("neighbors");
+  unsigned clusters = parameters.at("clusters");
+  unsigned varyt = parameters.at("varyt");
+  if (parameters.at("read_agents") == 1.0) {
+    read_agent_file(input_file, agents);
+    shuffle(agents.begin(), agents.end(), rng);
+  }
   std::cout << "alg,run,k,c,tomatch,success,rate,time"
 	    << std::endl;
   for (auto & c: algorithms_to_run) {
@@ -768,13 +713,14 @@ void run_tests(ParameterMap& parameters,
       t = clock() - t;
       float time_taken = (float) t / CLOCKS_PER_SEC;
       check_for_errors(agents);
+      report_stats(algorithm_name, i, agents, time_taken, parameters);
       if (csv_output) {
 	std::string csv_filename =
 	  std::string(algorithm_name) + std::string("_") +
+	  std::to_string(j) + std::string("_") +
 	  std::to_string(i) + std::string(".csv");
 	report_csv(csv_filename.c_str(), agents);
       }
-      report_stats(algorithm_name, i, agents, time_taken, parameters);
       if (parameters.at("varyk") > 0.0)
 	parameters["neighbors"] += parameters.at("varyk");
       if (varyt == 0 || (i + 1) % varyt == 0) {
@@ -786,6 +732,7 @@ void run_tests(ParameterMap& parameters,
 	}
       }
     }
+    ++j;
   }
   destroy_agents(agents);
 }
@@ -870,7 +817,11 @@ int main(int argc, char *argv[])
   const char *num_agents_str = getCmdOption(argv, argv + argc, "-n");
   if (cmdOptionExists(argv, argv + argc, "-o")) csv_output = true;
 
-  if (!input_file_str) input_file_str = "input_agents.csv";
+  if (input_file_str)
+    parameters["read_agents"] = 1.0;
+  else
+    parameters["read_agents"] = 0.0;
+
   if (seed_str) seed = std::stol(std::string(seed_str));
   if (algorithms_str) algorithms = std::string(algorithms_str);
   if (runs_str) runs = std::stol(std::string(runs_str));
