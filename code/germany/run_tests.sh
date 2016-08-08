@@ -13,45 +13,46 @@ echo "Arguments:" $0 $1
 echo "Starting time: "
 date
 
-# Create input files
-
 if [ "$1" != "skip" ]
     then
-    Rscript step2.R 10000 1
-    mv agent_list.csv agent_input_10000.csv
+    ./germany_partners-rel -s $RANDOM -a I -n 10000 -o
+    mv Initialpop_0_0.csv agent_input_10000.csv
 
-    Rscript step2.R 50000 1
-    mv agent_list.csv agent_input_50000.csv
+    ./germany_partners-rel -s $RANDOM -a I -n 50000 -o
+    mv Initialpop_0_0.csv agent_input_50000.csv
 
-    Rscript step2.R 100000 1
-    mv agent_list.csv agent_input_100000.csv
+    ./germany_partners-rel -s $RANDOM -a I -n 100000 -o
+    mv Initialpop_0_0.csv agent_input_100000.csv
 
-    Rscript step2.R 250000 1
-    mv agent_list.csv agent_input_250000.csv
+    ./germany_partners-rel -s $RANDOM -a I -n 250000 -o
+    mv Initialpop_0_0.csv agent_input_250000.csv
 
-    Rscript step2.R 500000 1
-    mv agent_list.csv agent_input_500000.csv
+    ./germany_partners-rel -s $RANDOM -a I -n 500000 -o
+    mv Initialpop_0_0.csv agent_input_500000.csv
 
-    Rscript step2.R 750000 1
-    mv agent_list.csv agent_input_750000.csv
+    ./germany_partners-rel -s $RANDOM -a I -n 750000 -o
+    mv Initialpop_0_0.csv agent_input_750000.csv
 
-    Rscript step2.R 1000000 1
-    mv agent_list.csv agent_input_1000000.csv
+    ./germany_partners-rel -s $RANDOM -a I -n 1000000 -o
+    mv Initialpop_0_0.csv agent_input_1000000.csv
 fi
 
-./germany_partners-rel -i agent_input_10000.csv -s $RANDOM -r 30 -k 75 -c 215 >output_fixed_10000.csv &
 
-./germany_partners-rel -i agent_input_50000.csv -s $RANDOM -r 30 -k 225 -c 565 >output_fixed_50000.csv &
+# Fixed k,c runs for timing
 
-./germany_partners-rel -i agent_input_100000.csv -s $RANDOM -r 30 -k 330 -c 1130 >output_fixed_100000.csv &
+./germany_partners-rel -s $RANDOM -a 30,IRKWCD -n 10000 -k 75 -c 215 >output_fixed_10000.csv &
 
-./germany_partners-rel -i agent_input_250000.csv -s $RANDOM -r 30 -k 740 -c 12800 >output_fixed_250000.csv &
+./germany_partners-rel -s $RANDOM -a 30,IRKWCD -n 50000 -k 225 -c 565 >output_fixed_50000.csv &
 
-./germany_partners-rel -i agent_input_500000.csv -s $RANDOM -r 30 -k 1620 -c 1700 >output_fixed_500000.csv &
+./germany_partners-rel -s $RANDOM -a 30,IRKWCD -n 100000 -k 225 -c 565 >output_fixed_100000.csv &
 
-./germany_partners-rel -i agent_input_750000.csv -s $RANDOM -r 30 -k 2170 -c 810 >output_fixed_750000.csv &
+./germany_partners-rel -s $RANDOM -a 30,IRKWCD -n 250000 -k 740 -c 1280 >output_fixed_250000.csv &
 
-./germany_partners-rel -i agent_input_1000000.csv -s $RANDOM -r 30 -k 2800 -c 3900 >output_fixed_1000000.csv &
+./germany_partners-rel -s $RANDOM -a 30,IRKWCD -n 500000 -k 1620 -c 1700 >output_fixed_500000.csv &
+
+./germany_partners-rel -s $RANDOM -a 30,IRKWCD -n 750000 -k 2170 -c 810 >output_fixed_750000.csv &
+
+./germany_partners-rel -s $RANDOM -a 30,IRKWCD -n 750000 -k 2800 -c 3900 >output_fixed_1000000.csv &
 
 wait
 

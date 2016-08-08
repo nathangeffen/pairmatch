@@ -163,9 +163,11 @@ static void check_for_errors(const AgentVector& agents)
 
 static AgentVector::iterator
 find_closest_match(AgentVector::iterator from,
-			AgentVector::iterator to)
+		   AgentVector::iterator to,
+		   unsigned& num_comparisons)
 {
   for (auto it = from + 1; it != to; ++it) {
+    ++num_comparisons;
     if (check_for_match(*from, *it)) {
       return it;
     }
@@ -175,18 +177,20 @@ find_closest_match(AgentVector::iterator from,
 
 /* Finds first available partner in k nearest neighbours */
 
-void find_partner(AgentVector& agents, const unsigned k)
+double find_partners(AgentVector& agents, const unsigned k)
 {
+  unsigned total_k = 0;
   for (auto it = agents.begin(); it < agents.end() - 1; ++it) {
     if ( (*it)->rel == WANTS_TO_BE_PARTNERED) {
       auto last = (agents.end() - it) < (k + 1) ?
 				      agents.end() : it + k + 1;
-      auto partner = find_closest_match(it, last);
+      auto partner = find_closest_match(it, last, total_k);
       if (partner != last) {
 	make_partner(*it, *partner);
       }
     }
   }
+  return (double) total_k / agents.size();
 }
 
 /* Matching Algorithms */
@@ -428,7 +432,7 @@ void create_partners_ACP(AgentVector& agents,
 
 /* Stefan's initial population creation algorithm. */
 
-void initial_pop(AgentVector& agents, const ParameterMap& parameters)
+void initial_pop(AgentVector& agents, ParameterMap& parameters)
 {
   CSVParser data_csv("data.csv", ";", true);
   DblMatrix data = data_csv.convert_all_entries_to_doubles();
@@ -465,34 +469,37 @@ void initial_pop(AgentVector& agents, const ParameterMap& parameters)
   wswRate = get_col(partners, 4);
   create_partners_ACP(agents, data, S, X, ageRange, ageShare, femRatio,
   		      wswRate, msmRate, ww, mw, wm, mm);
+  parameters["avg_k"] = 0.0;
 }
 
 /* Reference partner matching algorithm: Random match. */
 
 /* This algorithm is hopeless but fast. */
-void random_match(AgentVector& agents, const ParameterMap& parameters)
+void random_match(AgentVector& agents, ParameterMap& parameters)
 {
   std::shuffle(agents.begin(), agents.end(), rng);
   for (size_t i = 0; i < agents.size() - 1; ++i) {
-    if (check_for_match(agents[i], agents[i + 1])) {
+    if (agents[i]->rel == WANTS_TO_BE_PARTNERED &&
+	check_for_match(agents[i], agents[i + 1])) {
       make_partner(agents[i], agents[i + 1]);
     }
   }
+  parameters["avg_k"] = 1.0;
 }
 
 
 /* Select first matching partner from k nearest neighbours */
-void random_k_match(AgentVector& agents, const ParameterMap& parameters)
+void random_k_match(AgentVector& agents, ParameterMap& parameters)
 {
   unsigned k = (unsigned) parameters.at("neighbors");
   std::shuffle(agents.begin(), agents.end(), rng);
-  find_partner(agents, k);
+  parameters["avg_k"] = find_partners(agents, k);
 }
 
 /* Select first matching partner from weighted shuffle of k nearest
    neightbours.
 */
-void weighted_shuffle_match(AgentVector& agents, const ParameterMap& parameters)
+void weighted_shuffle_match(AgentVector& agents, ParameterMap& parameters)
 {
   std::uniform_real_distribution<double> uni;
   unsigned k = parameters.at("neighbors");
@@ -500,7 +507,7 @@ void weighted_shuffle_match(AgentVector& agents, const ParameterMap& parameters)
     agent->weight = agent->cluster_value() * uni(rng);
   std::sort(agents.begin(), agents.end(),
 	    [](Agent *a, Agent *b) {return a->weight < b->weight; });
-  find_partner(agents, k);
+  parameters["avg_k"] = find_partners(agents, k);
 }
 
 
@@ -508,7 +515,7 @@ void weighted_shuffle_match(AgentVector& agents, const ParameterMap& parameters)
  */
 
 void
-cluster_shuffle_match(AgentVector& agents, const ParameterMap& parameters)
+cluster_shuffle_match(AgentVector& agents, ParameterMap& parameters)
 {
   unsigned k = parameters.at("neighbors");
   unsigned clusters = parameters.at("clusters");
@@ -522,11 +529,11 @@ cluster_shuffle_match(AgentVector& agents, const ParameterMap& parameters)
     if (last > agents.end()) last = agents.end();
     std::shuffle(first, last, rng);
   }
-  find_partner(agents, k);
+  parameters["avg_k"] = find_partners(agents, k);
 }
 
 /*
-
+  Table needed by Distribution Match
  */
 
 struct Table {
@@ -534,10 +541,16 @@ struct Table {
   size_t entries;
 };
 
+/*
+  Sort according to distribution, then use distributional knowledge to locate
+  partners.
+*/
+
 void
-distribution_match(AgentVector& agents, const ParameterMap& parameters)
+distribution_match(AgentVector& agents, ParameterMap& parameters)
 {
   // We are going to match at most k neighbours
+  unsigned comparisons = 0;
   unsigned k = parameters.at("neighbors");
 
   // Shuffle the agents - O(n)
@@ -582,7 +595,8 @@ distribution_match(AgentVector& agents, const ParameterMap& parameters)
   }
   // Now match - O(n)
   for (auto & agent: agents) {
-    if (agent->partner) continue;
+    if (agent->partner || agent->rel == WANTS_TO_BE_SINGLE)
+      continue;
     // Calculate the start and end indices
     size_t rel = agent->rel;
     size_t age = agent->page;
@@ -595,6 +609,7 @@ distribution_match(AgentVector& agents, const ParameterMap& parameters)
 	 ++i) {
       if (agent == copy_agents[i])
 	continue; // Ignore if partnered and can't partner yourself
+      ++comparisons;
       if (check_for_match(agent, copy_agents[i])) {
 	make_partner(agent, copy_agents[i]);
 	// Swap with the last entry in this part of the table
@@ -604,6 +619,7 @@ distribution_match(AgentVector& agents, const ParameterMap& parameters)
       }
     }
   }
+  parameters["avg_k"] = (double) comparisons / agents.size();
 }
 
 /* Reporting */
@@ -648,6 +664,7 @@ static void report_stats(const char *report_name,
 	    << agents_to_be_matched << ","
 	    << agents_successfully_matched << ","
 	    << success_rate << ","
+	    << parameters.at("avg_k") << ","
 	    << time_taken << std::endl;
 }
 
@@ -659,7 +676,7 @@ void run_tests(ParameterMap& parameters,
 {
   AgentVector agents;
   unsigned j = 0;
-  std::function<void(AgentVector &, const ParameterMap)> algorithm;
+  std::function<void(AgentVector &, ParameterMap &)> algorithm;
   const char* algorithm_name;
   std::string csv_file_name;
   unsigned neighbors = parameters.at("neighbors");
@@ -669,7 +686,7 @@ void run_tests(ParameterMap& parameters,
     read_agent_file(input_file, agents);
     shuffle(agents.begin(), agents.end(), rng);
   }
-  std::cout << "alg,run,k,c,tomatch,success,rate,time"
+  std::cout << "alg,run,k,c,tomatch,success,rate,avgk,time"
 	    << std::endl;
   for (auto & c: algorithms_to_run) {
     switch(c) {
@@ -784,8 +801,9 @@ int main(int argc, char *argv[])
 	      << " [-i input file name]\n"
 	      << "    (if this isn't specified, input_agents.csv is used)\n"
 	      << " [-s random seed integer]\n"
-	      << " [-a ([R][K][W][C][D])+] \n"
+	      << " [-a [n,]([I][R][K][W][C][D])+] \n"
 	      << "    where:\n"
+	      << "    n = how many times to repeat the subsequent string\n"
 	      << "    I = Initial population creation matching\n"
 	      << "    R = Random matching\n"
 	      << "    K = Random k matching\n"
@@ -823,7 +841,18 @@ int main(int argc, char *argv[])
     parameters["read_agents"] = 0.0;
 
   if (seed_str) seed = std::stol(std::string(seed_str));
-  if (algorithms_str) algorithms = std::string(algorithms_str);
+  if (algorithms_str) {
+    algorithms = std::string(algorithms_str);
+    std::size_t found = algorithms.find_first_of(",");
+    if (found != std::string::npos) {
+      std::string int_part(algorithms,0, found);
+      size_t n = std::stol(int_part);
+      std::string alg_part(algorithms,found + 1);
+      algorithms = string("");
+      for (size_t i = 0; i < n; ++i)
+	algorithms += alg_part;
+    }
+  }
   if (runs_str) runs = std::stol(std::string(runs_str));
   if (neighbors_str)
     parameters["neighbors"] =  (double) std::stol(std::string(neighbors_str));
