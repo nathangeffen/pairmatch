@@ -339,32 +339,17 @@ void create_partners_ACP(AgentVector& agents,
 {
   std::uniform_real_distribution<double> uni;
   Sample sample_ageshare(ageShare, &rng);
-  vector<Sample> sample_matWW(matWW.size());
-  vector<Sample> sample_matMW(matMW.size());
-  vector<Sample> sample_matWM(matWM.size());
-  vector<Sample> sample_matMM(matMM.size());
-  std::vector<double> placeholder(matMM[0].size(), 0.000001);
+  vector<Sample> sample_matWW(matWW[0].size());
+  vector<Sample> sample_matMW(matMW[0].size());
+  vector<Sample> sample_matWM(matWM[0].size());
+  vector<Sample> sample_matMM(matMM[0].size());
+  std::vector<double> placeholder(matMM.size(), 0.000001);
 
-  for (unsigned i = 0; i < matWW.size(); ++i) {
-    if (check_gt_0(matWW[i]))
-      sample_matWW[i].init(matWW[i], &rng);
-    else
-      sample_matWW[i].init(placeholder, &rng);
-
-    if (check_gt_0(matWM[i]))
-      sample_matWM[i].init(matWM[i], &rng);
-    else
-      sample_matWM[i].init(placeholder, &rng);
-
-    if (check_gt_0(matMW[i]))
-      sample_matMW[i].init(matMW[i], &rng);
-    else
-      sample_matMW[i].init(placeholder, &rng);
-
-    if (check_gt_0(matMM[i]))
-      sample_matMM[i].init(matMM[i], &rng);
-    else
-      sample_matMM[i].init(placeholder, &rng);
+  for (unsigned i = 0; i < matWW[0].size(); ++i) {
+    sample_matWW[i].init(get_col(matWW,i), &rng);
+    sample_matWM[i].init(get_col(matWM,i), &rng);
+    sample_matMW[i].init(get_col(matMW,i), &rng);
+    sample_matMM[i].init(get_col(matMM,i), &rng);
   }
   for (unsigned i = fromAgent; i + 1 < toAgent; i+=2) {
     Agent *agent = new Agent();
