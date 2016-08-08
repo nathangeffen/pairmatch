@@ -71,21 +71,63 @@ double str_to_num(std::string& s)
 static void read_agent_file(const char* filename,
 			    AgentVector& agents)
 {
-    CSVParser agents_csv(filename, ",", true);
-    for (auto& row: agents_csv.string_rows) {
+  std::ifstream infile;
+  infile.open (filename, std::ifstream::in);
+  if (infile.fail()) {
+    std::cerr << "Error opening " << filename << std::endl;
+    exit(1);
+  }
+  unsigned line = 0;
+  while (infile)
+  {
+    try {
+      ++line;
+      std::string s;
+      if (!std::getline( infile, s )) break;
+      std::istringstream ss(s);
+
+      if (line == 1) continue;
       Agent* agent = new Agent();
-      // "id","age","sex","sexor","rel","pid","page","psex","psexor"
-      agent->id = str_to_num(row[0]);
-      agent->age = str_to_num(row[1]);
-      agent->sex = str_to_num(row[2]);
-      agent->sexor = str_to_num(row[3]);
-      agent->rel = str_to_num(row[4]);
-      // skip row[5] pid
-      agent->page = str_to_num(row[6]);
-      agent->psex = str_to_num(row[7]);
-      agent->psexor = str_to_num(row[8]);
+      if (!std::getline( ss, s, ',' )) break;
+      if (s == "NA") {
+	std::getline( infile, s );
+	break;
+      }
+      agent->id = stol(s);
+      if (!std::getline( ss, s, ',' )) break;
+      agent->age = stol(s);
+      if (!std::getline( ss, s, ',' )) break;
+      agent->sex = stol(s);
+      if (!std::getline( ss, s, ',' )) break;
+      agent->sexor = stol(s);
+      if (!std::getline( ss, s, ',' )) break;
+      agent->rel = stol(s);
+      // pid - skip
+      if (!std::getline( ss, s, ',' )) break;
+      // page
+      if (!std::getline( ss, s, ',' )) break;
+      agent->page = stol(s);
+      // psex
+      if (!std::getline( ss, s, ',' )) break;
+      agent->psex = stol(s);
+      // psexor
+      if (!std::getline( ss, s, ',' )) break;
+      agent->psexor = stol(s);
+      //if (!std::getline( ss, s)) break;
       agents.push_back(agent);
+    } catch (std::exception &e) {
+      std::cerr << "Exception at line " << line << " with message: " << e.what()
+		<< std::endl;
+      exit(1);
     }
+  }
+
+  if (!infile.eof())
+  {
+    std::cerr << "Should have reached end of file but didn't at line: " << line << std::endl;
+    std::cerr << "Failbit: " << infile.fail() << std::endl;
+    exit(1);
+  }
 }
 
 void clear_partners(AgentVector& agents)
