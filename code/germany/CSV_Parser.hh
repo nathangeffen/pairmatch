@@ -30,13 +30,13 @@ public:
       const char **rowFields = CsvParser_getFields(row);
       for (int i = 0 ; i < CsvParser_getNumFields(row) ; i++)
 	str_row.push_back(rowFields[i]);
-      string_rows_.push_back(str_row);
+      string_rows.push_back(str_row);
     }
 
   };
   DblMatrix convert_all_entries_to_doubles() {
     DblMatrix double_rows;
-    for (auto& r: string_rows_) {
+    for (auto& r: string_rows) {
       std::vector<double> double_row;
       for (auto& s: r) {
 	boost::replace_all(s, ",", ".");
@@ -45,18 +45,18 @@ public:
       }
       double_rows.push_back(double_row);
     }
-      return double_rows;
+    return double_rows;
   };
   ~CSVParser() {
     for (auto& row: rows_)
       CsvParser_destroy_row(row);
     CsvParser_destroy(csvparser_);
   };
-
+  std::vector< std::vector<std::string> > string_rows;
 private:
   CsvRow *header_ = NULL;
   std::vector<CsvRow *> rows_;
-  std::vector< std::vector<std::string> > string_rows_;
+
   CsvParser *csvparser_;
 };
 

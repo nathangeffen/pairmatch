@@ -61,25 +61,29 @@ void destroy_agents(AgentVector& agents)
     delete agent;
 }
 
-
+double str_to_num(std::string& s)
+{
+  boost::replace_all(s, ",", ".");
+  boost::replace_all(s, "NA", "0");
+  return stod(s);
+}
 
 static void read_agent_file(const char* filename,
 			    AgentVector& agents)
 {
     CSVParser agents_csv(filename, ",", true);
-    DblMatrix agent_matrix = agents_csv.convert_all_entries_to_doubles();
-    for (auto& row: agent_matrix) {
+    for (auto& row: agents_csv.string_rows) {
       Agent* agent = new Agent();
       // "id","age","sex","sexor","rel","pid","page","psex","psexor"
-      agent->id = row[0];
-      agent->age = row[1];
-      agent->sex = row[2];
-      agent->sexor = row[3];
-      agent->rel = row[4];
+      agent->id = str_to_num(row[0]);
+      agent->age = str_to_num(row[1]);
+      agent->sex = str_to_num(row[2]);
+      agent->sexor = str_to_num(row[3]);
+      agent->rel = str_to_num(row[4]);
       // skip row[5] pid
-      agent->page = row[6];
-      agent->psex = row[7];
-      agent->psexor = row[8];
+      agent->page = str_to_num(row[6]);
+      agent->psex = str_to_num(row[7]);
+      agent->psexor = str_to_num(row[8]);
       agents.push_back(agent);
     }
 }
