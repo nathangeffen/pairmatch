@@ -53,6 +53,13 @@ struct Agent {
   {
     return (page / 100.0 + age / 100.0) / 2.0 + sexor;
   };
+  void print()
+  {
+    printf("Id: %d Age: %d Sex: %d Sexor: %d Rel: %d "
+	   "Page: %d Psex: %d Psexor: %d Partner: %d\n",
+	   id, age, sex, sexor, rel, page, psex, psexor,
+	   (partner == NULL) ? 0 : partner->id);
+  }
 };
 
 
@@ -608,19 +615,21 @@ distribution_match(AgentVector& agents, ParameterMap& parameters)
 	      return false;
 	    });
   // We need a distribution table. Initialization O(1)
-  Table table[NUM_RELS][NUM_AGES][NUM_SEXES][NUM_ORIENTATIONS] = {0, 0};
+  Table table[NUM_RELS][NUM_AGES][NUM_SEXES][NUM_ORIENTATIONS][NUM_AGES] = {0, 0};
 
   // Populate the table indices - O(n)
   for(auto & agent: copy_agents)
-    ++table[agent->rel][agent->age][agent->sex][agent->sexor].entries;
+    ++table[agent->rel][agent->age][agent->sex][agent->sexor][agent->page].entries;
   size_t last_index = 0;
   // This is constant time despite the four loops - O(1)
   for (size_t i = 0; i < NUM_RELS; ++i) {
     for (size_t j = 0; j < NUM_AGES; ++j) {
       for (size_t k = 0; k < NUM_SEXES; ++k) {
 	for (size_t l = 0; l < NUM_ORIENTATIONS; ++l) {
-	  table[i][j][k][l].start = last_index;
-	  last_index += table[i][j][k][l].entries;
+	  for (size_t m = 0; m < NUM_AGES; ++m) {
+	    table[i][j][k][l][m].start = last_index;
+	    last_index += table[i][j][k][l][m].entries;
+	  }
 	}
       }
     }
@@ -634,22 +643,22 @@ distribution_match(AgentVector& agents, ParameterMap& parameters)
       continue;
     // Calculate the start and end indices
     size_t rel = agent->rel;
-    size_t age = agent->page;
+    size_t age = agent->page; // We want the partner's age
+    size_t page = agent->age; // We want the partner's desired partner age
     size_t sex = (agent->sexor == HOMOSEXUAL) ? agent->sex : (!agent->sex);
     size_t sexor = agent->sexor;
-    size_t start_index = table[rel][age][sex][sexor].start;
-    size_t last_index =
-      std::min(std::min(start_index + table[rel][age][sex][sexor].entries,
-			start_index + k),
-	       agents.size());
+    size_t start_index = table[rel][age][sex][sexor][page].start;
+    size_t last_entry = start_index + table[rel][age][sex][sexor][page].entries;
+    size_t last_index = std::min(std::min(last_entry, start_index + k),
+				 agents.size());
     for (size_t i = start_index; i < last_index; ++i, ++comparisons) {
       if (agent == copy_agents[i])
 	continue; // Ignore if partnered and can't partner yourself
       if (check_for_match(agent, copy_agents[i])) {
 	make_partner(agent, copy_agents[i]);
 	// Swap with the last entry in this part of the table
-	std::swap(copy_agents[i], copy_agents[last_index - 1]);
-	--table[rel][age][sex][sexor].entries;
+	std::swap(copy_agents[i], copy_agents[last_entry - 1]);
+	--table[rel][age][sex][sexor][page].entries;
 	break;
       }
     }
