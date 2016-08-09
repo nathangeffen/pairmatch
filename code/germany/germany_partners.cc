@@ -592,6 +592,8 @@ distribution_match(AgentVector& agents, ParameterMap& parameters)
   // Perhaps this can be replaced with distribution_sort but
   // the effort isn't worth it because sorting takes 1/30th of the execution time
   // on a 1m record input file with k=3000.
+  std::cout << "D0: " << std::endl;
+  clock_t t = clock();
   std::sort(copy_agents.begin(), copy_agents.end(),
 	    [](Agent *a, Agent *b) {
 	      if (a->rel < b->rel) return true;
@@ -606,6 +608,9 @@ distribution_match(AgentVector& agents, ParameterMap& parameters)
 	      if (b->page < a->page) return false;
 	      return false;
 	    });
+  t = clock() - t;
+  float time_taken = (float) t / CLOCKS_PER_SEC;
+  std::cout << "D1: " << time_taken << std::endl;
   // We need a distribution table. Initialization O(1)
   Table table[NUM_RELS][NUM_AGES][NUM_SEXES][NUM_ORIENTATIONS] = {0, 0};
 
@@ -635,12 +640,12 @@ distribution_match(AgentVector& agents, ParameterMap& parameters)
     size_t sexor = agent->sexor;
     size_t start_index = table[rel][age][sex][sexor].start;
     size_t last_index =
-      std::min(start_index + table[rel][age][sex][sexor].entries, agents.size());
-    for (size_t i = start_index; (i < last_index) && (i < (start_index + k));
-	 ++i) {
+      std::min(std::min(start_index + table[rel][age][sex][sexor].entries,
+			start_index + k),
+	       agents.size());
+    for (size_t i = start_index; i < last_index; ++i, ++comparisons) {
       if (agent == copy_agents[i])
 	continue; // Ignore if partnered and can't partner yourself
-      ++comparisons;
       if (check_for_match(agent, copy_agents[i])) {
 	make_partner(agent, copy_agents[i]);
 	// Swap with the last entry in this part of the table
