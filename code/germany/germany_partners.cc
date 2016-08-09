@@ -6,8 +6,9 @@
 #include <sstream>
 #include <string>
 #include <random>
-#include <ctime>
 #include <cstdio>
+#include <ctime>
+#include <cstdint>
 #include <unordered_map>
 #include <vector>
 
@@ -210,7 +211,7 @@ static void check_for_errors(const AgentVector& agents)
 static AgentVector::iterator
 find_closest_match(AgentVector::iterator from,
 		   AgentVector::iterator to,
-		   unsigned& num_comparisons)
+		   uint64_t& num_comparisons)
 {
   for (auto it = from + 1; it != to; ++it) {
     ++num_comparisons;
@@ -225,7 +226,7 @@ find_closest_match(AgentVector::iterator from,
 
 double find_partners(AgentVector& agents, const unsigned k)
 {
-  unsigned total_k = 0;
+  uint64_t total_k = 0;
   for (auto it = agents.begin(); it < agents.end() - 1; ++it) {
     if ( (*it)->rel == WANTS_TO_BE_PARTNERED) {
       auto last = (agents.end() - it) < (k + 1) ?
@@ -581,7 +582,7 @@ void
 distribution_match(AgentVector& agents, ParameterMap& parameters)
 {
   // We are going to match at most k neighbours
-  unsigned comparisons = 0;
+  uint64_t comparisons = 0;
   unsigned k = parameters.at("neighbors");
 
   // Shuffle the agents - O(n)
