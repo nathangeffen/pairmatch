@@ -592,8 +592,6 @@ distribution_match(AgentVector& agents, ParameterMap& parameters)
   // Perhaps this can be replaced with distribution_sort but
   // the effort isn't worth it because sorting takes 1/30th of the execution time
   // on a 1m record input file with k=3000.
-  std::cout << "D0: " << std::endl;
-  clock_t t = clock();
   std::sort(copy_agents.begin(), copy_agents.end(),
 	    [](Agent *a, Agent *b) {
 	      if (a->rel < b->rel) return true;
@@ -608,15 +606,10 @@ distribution_match(AgentVector& agents, ParameterMap& parameters)
 	      if (b->page < a->page) return false;
 	      return false;
 	    });
-  t = clock() - t;
-  float time_taken = (float) t / CLOCKS_PER_SEC;
-  std::cout << "D1: " << time_taken << std::endl;
   // We need a distribution table. Initialization O(1)
   Table table[NUM_RELS][NUM_AGES][NUM_SEXES][NUM_ORIENTATIONS] = {0, 0};
 
   // Populate the table indices - O(n)
-  t = clock();
-  std::cout << "D2: " << std::endl;
   for(auto & agent: copy_agents)
     ++table[agent->rel][agent->age][agent->sex][agent->sexor].entries;
   size_t last_index = 0;
@@ -631,13 +624,11 @@ distribution_match(AgentVector& agents, ParameterMap& parameters)
       }
     }
   }
-  t = clock() - t;
-  time_taken = (float) t / CLOCKS_PER_SEC;
-  std::cout << "D3: " << time_taken << std::endl;
+
   // Now match - O(n)
   unsigned i = 0;
   for (auto & agent: agents) {
-    if (++i % 5000 == 0) std::cout << "D4: " << i << std::endl;
+    if (++i%50000==0) std::cout << "D4: " << i << " " << comparisons << std::endl;
     if (agent->partner || agent->rel == WANTS_TO_BE_SINGLE)
       continue;
     // Calculate the start and end indices
