@@ -29,7 +29,7 @@ std::mt19937 rng;
 #define NUM_SEXES 2
 #define NUM_ORIENTATIONS 2
 
-class Agent;
+struct Agent;
 
 typedef std::unordered_map<const char *, double> ParameterMap;
 typedef std::vector<Agent *> AgentVector;
@@ -625,13 +625,9 @@ distribution_match(AgentVector& agents, ParameterMap& parameters)
   // Shuffle the agents - O(n)
   std::shuffle(agents.begin(), agents.end(), rng);
   // Make a copy of the agent **POINTERS** - O(n)
-  clock_t t = clock();
   AgentVector copy_agents(agents.size());
   // Sort the agent pointers on age, sex, sexor, desired_age O(n + num buckets)
   dist_sort(agents.begin(), agents.end(), copy_agents.begin(), 0, num_buckets, get_bucket);
-  t = clock() - t;
-  float time_taken = (float) t / CLOCKS_PER_SEC;
-  std::cout << "D0: Time taken: " << time_taken << std::endl;
   Table table[NUM_RELS][NUM_AGES][NUM_SEXES][NUM_ORIENTATIONS][NUM_AGES] = {0, 0};
 
   // Populate the table indices - O(n)
