@@ -62,7 +62,6 @@ struct Agent {
   }
 };
 
-
 void destroy_agents(AgentVector& agents)
 {
   for (auto &agent: agents)
@@ -585,6 +584,37 @@ struct Table {
   partners.
 */
 
+template <class RandomAccessIterator, class GetBucket>
+void dist_sort (RandomAccessIterator first, RandomAccessIterator last,
+		RandomAccessIterator out,
+		unsigned lo, unsigned hi,
+		GetBucket getBucket)
+{
+  std::vector<unsigned> D(hi - lo + 1, 0);
+  for (auto it = first; it != last; ++it) {
+    unsigned bucket = getBucket(*it);
+    ++D[bucket - lo];
+  }
+  for (unsigned j = 1; j < D.size(); ++j)
+    D[j] = D[j - 1] + D[j];
+  for (auto it = last - 1; it >= first; --it) {
+    unsigned j = getBucket(*it) - lo;
+    *(out + D[j] - 1) = *it;
+    --D[j];
+  }
+}
+
+const unsigned sexor_dim = NUM_AGES;
+const unsigned sex_dim = NUM_ORIENTATIONS * sexor_dim;
+const unsigned age_dim = NUM_SEXES * sex_dim;
+const unsigned rel_dim = NUM_AGES * age_dim;
+const unsigned num_buckets = NUM_RELS * rel_dim;
+
+unsigned get_bucket(const Agent* a)
+{
+  return a->rel * rel_dim + a->age * age_dim + a->sex * sex_dim + a->sexor * sexor_dim + a->page;
+}
+
 void
 distribution_match(AgentVector& agents, ParameterMap& parameters)
 {
@@ -595,26 +625,13 @@ distribution_match(AgentVector& agents, ParameterMap& parameters)
   // Shuffle the agents - O(n)
   std::shuffle(agents.begin(), agents.end(), rng);
   // Make a copy of the agent **POINTERS** - O(n)
-  AgentVector& copy_agents = agents;
-  // Sort the agent pointers on age, sex, sexor, desired_age O(n log n)
-  // Perhaps this can be replaced with distribution_sort but
-  // the effort isn't worth it because sorting takes 1/30th of the execution time
-  // on a 1m record input file with k=3000.
-  std::sort(copy_agents.begin(), copy_agents.end(),
-	    [](Agent *a, Agent *b) {
-	      if (a->rel < b->rel) return true;
-	      if (b->rel < a->rel) return false;
-	      if (a->age < b->age) return true;
-	      if (b->age < a->age) return false;
-	      if (a->sex < b->sex) return true;
-	      if (b->sex < a->sex) return false;
-	      if (a->sexor < b->sexor) return true;
-	      if (b->sexor < a->sexor) return false;
-	      if (a->page < b->page) return true;
-	      if (b->page < a->page) return false;
-	      return false;
-	    });
-  // We need a distribution table. Initialization O(1)
+  clock_t t = clock();
+  AgentVector copy_agents(agents.size());
+  // Sort the agent pointers on age, sex, sexor, desired_age O(n + num buckets)
+  dist_sort(agents.begin(), agents.end(), copy_agents.begin(), 0, num_buckets, get_bucket);
+  t = clock() - t;
+  float time_taken = (float) t / CLOCKS_PER_SEC;
+  std::cout << "D0: Time taken: " << time_taken << std::endl;
   Table table[NUM_RELS][NUM_AGES][NUM_SEXES][NUM_ORIENTATIONS][NUM_AGES] = {0, 0};
 
   // Populate the table indices - O(n)
@@ -636,9 +653,7 @@ distribution_match(AgentVector& agents, ParameterMap& parameters)
   }
 
   // Now match - O(n)
-  unsigned i = 0;
   for (auto & agent: agents) {
-    if (++i%50000==0) std::cout << "D4: " << i << " " << comparisons << std::endl;
     if (agent->partner || agent->rel == WANTS_TO_BE_SINGLE)
       continue;
     // Calculate the start and end indices
