@@ -29,11 +29,16 @@ std::mt19937 rng;
 #define NUM_SEXES 2
 #define NUM_ORIENTATIONS 2
 
+const unsigned SEXOR_DIM = NUM_AGES;
+const unsigned SEX_DIM = NUM_ORIENTATIONS * SEXOR_DIM;
+const unsigned AGE_DIM = NUM_SEXES * SEX_DIM;
+const unsigned REL_DIM = NUM_AGES * AGE_DIM;
+const unsigned NUM_BUCKETS = NUM_RELS * REL_DIM;
+
 struct Agent;
 
 typedef std::unordered_map<const char *, double> ParameterMap;
 typedef std::vector<Agent *> AgentVector;
-
 
 struct Agent {
   unsigned id;
@@ -604,15 +609,12 @@ void dist_sort (RandomAccessIterator first, RandomAccessIterator last,
   }
 }
 
-const unsigned sexor_dim = NUM_AGES;
-const unsigned sex_dim = NUM_ORIENTATIONS * sexor_dim;
-const unsigned age_dim = NUM_SEXES * sex_dim;
-const unsigned rel_dim = NUM_AGES * age_dim;
-const unsigned num_buckets = NUM_RELS * rel_dim;
+#define GET_BUCKET(rel, age, sex, sexor, page) \
+  (rel * REL_DIM + age * AGE_DIM + sex * SEX_DIM + sexor * SEXOR_DIM + page)
 
-unsigned get_bucket(const Agent* a)
+inline unsigned get_bucket(const Agent* a)
 {
-  return a->rel * rel_dim + a->age * age_dim + a->sex * sex_dim + a->sexor * sexor_dim + a->page;
+  return GET_BUCKET(a->rel, a->age, a->sex, a->sexor, a->page);
 }
 
 void
@@ -627,25 +629,17 @@ distribution_match(AgentVector& agents, ParameterMap& parameters)
   // Make a copy of the agent **POINTERS** - O(n)
   AgentVector copy_agents(agents.size());
   // Sort the agent pointers on age, sex, sexor, desired_age O(n + num buckets)
-  dist_sort(agents.begin(), agents.end(), copy_agents.begin(), 0, num_buckets, get_bucket);
-  Table table[NUM_RELS][NUM_AGES][NUM_SEXES][NUM_ORIENTATIONS][NUM_AGES] = {0, 0};
+  dist_sort(agents.begin(), agents.end(), copy_agents.begin(), 0,
+	    NUM_BUCKETS, get_bucket);
+  Table table[NUM_BUCKETS] = {0, 0};
 
-  // Populate the table indices - O(n)
+  // Populate the table entries - O(n)
   for(auto & agent: copy_agents)
-    ++table[agent->rel][agent->age][agent->sex][agent->sexor][agent->page].entries;
+    ++table[get_bucket(agent)].entries;
   size_t last_index = 0;
-  // This is constant time despite the four loops - O(1)
-  for (size_t i = 0; i < NUM_RELS; ++i) {
-    for (size_t j = 0; j < NUM_AGES; ++j) {
-      for (size_t k = 0; k < NUM_SEXES; ++k) {
-	for (size_t l = 0; l < NUM_ORIENTATIONS; ++l) {
-	  for (size_t m = 0; m < NUM_AGES; ++m) {
-	    table[i][j][k][l][m].start = last_index;
-	    last_index += table[i][j][k][l][m].entries;
-	  }
-	}
-      }
-    }
+  for (size_t i = 0; i < NUM_BUCKETS; ++i) {
+    table[i].start = last_index;
+    last_index += table[i].entries;
   }
 
   // Now match - O(n)
@@ -658,8 +652,9 @@ distribution_match(AgentVector& agents, ParameterMap& parameters)
     size_t page = agent->age; // We want the partner's desired partner age
     size_t sex = (agent->sexor == HOMOSEXUAL) ? agent->sex : (!agent->sex);
     size_t sexor = agent->sexor;
-    size_t start_index = table[rel][age][sex][sexor][page].start;
-    size_t last_entry = start_index + table[rel][age][sex][sexor][page].entries;
+    size_t bucket = GET_BUCKET(rel, age, sex, sexor, page);
+    size_t start_index = table[bucket].start;
+    size_t last_entry = start_index + table[bucket].entries;
     size_t last_index = std::min(std::min(last_entry, start_index + k),
 				 agents.size());
     for (size_t i = start_index; i < last_index; ++i, ++comparisons) {
@@ -669,7 +664,7 @@ distribution_match(AgentVector& agents, ParameterMap& parameters)
 	make_partner(agent, copy_agents[i]);
 	// Swap with the last entry in this part of the table
 	std::swap(copy_agents[i], copy_agents[last_entry - 1]);
-	--table[rel][age][sex][sexor][page].entries;
+	--table[bucket].entries;
 	break;
       }
     }
