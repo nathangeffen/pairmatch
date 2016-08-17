@@ -19,6 +19,8 @@
 
 #define MALE 0
 #define FEMALE 1
+#define MIN_AGE 10
+#define MAX_AGE 100
 
 class Agent;
 
@@ -31,8 +33,9 @@ struct InitialVals {
   double prob_tst_pos = 0.4;
   double prob_tb_inf = 0.45;
   double prob_tb_sick = 0.01;
-  double prob_hetero = 1.0;
-  double current_date = 0.0;
+  double prob_hetero = 0.9;
+  double current_date = 2015.0;
+  double dob_range = 10.0;
   double max_x_coord = 10.0;
   double max_y_coord = 10.0;
   unsigned last_agent = 0;
@@ -46,17 +49,61 @@ struct InitialVals {
   double previous_partner_factor = 500.0;
 };
 
+/*
+  Table needed by Distribution Match
+ */
+
+struct Table {
+  size_t start;
+  size_t entries;
+};
+
+/*
+  Sort according to distribution, then use distributional knowledge to locate
+  partners.
+*/
+
+template <class RandomAccessIterator, class GetBucket>
+void dist_sort (RandomAccessIterator first, RandomAccessIterator last,
+		RandomAccessIterator out,
+		const unsigned lo, const unsigned hi,
+		GetBucket getBucket)
+{
+  std::vector<unsigned> D(hi - lo + 1, 0);
+  for (auto it = first; it != last; ++it) {
+    unsigned bucket = getBucket(*it);
+    ++D[bucket - lo];
+  }
+  for (unsigned j = 1; j < D.size(); ++j)
+    D[j] = D[j - 1] + D[j];
+  for (auto it = last - 1; it >= first; --it) {
+    unsigned j = getBucket(*it) - lo;
+    *(out + D[j] - 1) = *it;
+    --D[j];
+  }
+}
+
+
+#define DOB_DIM 100
+#define SEX_DIM 2
+#define SEXOR_DIM 2
+#define NUM_BUCKETS (DOB_DIM * SEX_DIM * SEXOR_DIM)
+
+#define GET_BUCKET(age, sex, sexor)		\
+  (SEX_DIM * sex + SEXOR_DIM * sexor + (age - MIN_AGE))
+
 class Agent {
-private:
-  InitialVals &initial_vals_;
 public:
+  InitialVals &initial_vals_;
   Agent(InitialVals &initial_vals) : initial_vals_(initial_vals) {
+    std::uniform_int_distribution<int> uni_age(0,(unsigned)
+					       initial_vals_.dob_range);
     std::uniform_real_distribution<double> uni;
     std::uniform_real_distribution<double> uni_x(0, initial_vals_.max_x_coord);
     std::uniform_real_distribution<double> uni_y(0, initial_vals_.max_y_coord);
     id = initial_vals_.last_agent++;
     sex = uni(initial_vals_.rng) < initial_vals_.prob_male ? MALE : FEMALE;
-    dob = initial_vals_.current_date;
+    dob = initial_vals_.current_date - 15.0 - uni_age(initial_vals_.rng);
     tightness = uni(initial_vals.rng);
     hiv_pos = uni(initial_vals_.rng) < initial_vals_.prob_hiv_pos ? true : false;
     tst_pos = uni(initial_vals_.rng) < initial_vals_.prob_tst_pos ? true : false;
@@ -132,6 +179,12 @@ public:
   std::vector<Agent* > partners;
 };
 
+/* Needed by distribution match */
+unsigned get_bucket(const Agent* a)
+{
+  unsigned age = a->initial_vals_.current_date - a->dob;
+  return GET_BUCKET(age, a->sex, a->hetero);
+}
 
 /* Class that contains simulation management functions
    and the partner matching algorithms that are being
@@ -342,6 +395,72 @@ public:
     }
   }
 
+
+  /* Distribution match */
+
+  void
+  distribution_match(int ages, unsigned neighbors)
+  {
+    std::shuffle(agents.begin(), agents.end(), initial_vals.rng);
+    // Make a copy of the agent **POINTERS** - O(n)
+    std::vector<Agent *>  copy_agents(agents.size());
+    // Sort the agent pointers on age, sex, sexor, desired_age O(n + num buckets)
+    dist_sort(agents.begin(), agents.end(), copy_agents.begin(),
+	      0, NUM_BUCKETS, get_bucket);
+    Table table[NUM_BUCKETS] = {0, 0};
+
+    // Populate the table entries - O(n)
+    for(auto & agent: copy_agents)
+      ++table[get_bucket(agent)].entries;
+    size_t last_index = 0;
+    for (size_t i = 0; i < NUM_BUCKETS; ++i) {
+      table[i].start = last_index;
+      last_index += table[i].entries;
+    }
+
+    // Now match - O(n)
+    for (auto& agent: agents) {
+      // already matched - continue
+      if (agent->partners.size() >= iteration) continue;
+      Agent *best_partner = NULL;
+      double smallest_distance = DBL_MAX;
+      size_t best_bucket = NUM_BUCKETS;
+      size_t best_last_entry = agents.size();
+      size_t best_index = agents.size();
+      for (int j = -ages; j < ages; ++j) {
+	unsigned pdob = (unsigned) agent->initial_vals_.current_date -
+	  agent->dob  + j;
+	unsigned psex = (agent->hetero == 1.0) ? (!agent->sex) : agent->sex;
+	unsigned psexor = (unsigned) agent->hetero;
+	size_t bucket = GET_BUCKET(pdob, psex, psexor);
+	auto start_index = table[bucket].start;
+	size_t last_entry = table[bucket].start + table[bucket].entries;
+	size_t last_index = std::min(std::min(last_entry,
+					      start_index + neighbors),
+				     agents.size());
+	for (size_t i = start_index; i < last_index; ++i) {
+	  if (agent == copy_agents[i]) continue;
+	  if (copy_agents[i]->partners.size() < iteration) {
+	    double distance = copy_agents[i]->distance(*agent);
+	    if (distance < smallest_distance) {
+	      best_partner = copy_agents[i];
+	      smallest_distance = distance;
+	      best_bucket = bucket;
+	      best_last_entry = last_entry;
+	      best_index = i;
+	    }
+	  }
+	}
+      }
+      if (best_partner) {
+	agent->partners.push_back(best_partner);
+	best_partner->partners.push_back(agent);
+	std::swap(copy_agents[best_index], copy_agents[best_last_entry - 1]);
+	--table[best_bucket].entries;
+      }
+    }
+  }
+
   /* Statistical and timing functions. */
 
   double
@@ -356,6 +475,7 @@ public:
 
     for (auto & a: agents) {
       if (a->partners.size() < iteration) {
+	printf("Warning unmatched: %d\n", a->id);
 	--denom;
       } else {
 	assert(a->partners.back());
@@ -505,6 +625,7 @@ bool cmdOptionExists(char** begin, char** end, const std::string& option)
 
 void run_tests(std::size_t population = 16,
 	       unsigned clusters = 4,
+	       int ages = 4,
 	       unsigned neighbors = 2,
 	       unsigned iterations = 1,
 	       unsigned seed = 0,
@@ -538,6 +659,10 @@ void run_tests(std::size_t population = 16,
       stats(s, "Cluster shuffle", [&](){
 	  s.cluster_shuffle_match(clusters, neighbors);
 	}, iterations, i);
+    if (algorithms.find("D") != std::string::npos)
+      stats(s, "Distribution match", [&](){
+	  s.distribution_match(ages, neighbors);
+	}, iterations, i);
     if (algorithms.find("B") != std::string::npos)
       stats(s, "Brute force", [&](){s.brute_force_match();}, iterations, i);
   }
@@ -546,16 +671,17 @@ void run_tests(std::size_t population = 16,
 int main(int argc, char *argv[])
 {
   unsigned population = 16, clusters = 4, neighbors = 2,
-    seed = 0, iterations = 1, runs = 1;
+    seed = 0, iterations = 1, runs = 1, ages = 5;
   bool verbose = false;
   char *population_str = getCmdOption(argv, argv + argc, "-p");
   char *neighbors_str = getCmdOption(argv, argv + argc, "-n");
   char *clusters_str = getCmdOption(argv, argv + argc, "-c");
+  char *ages_str = getCmdOption(argv, argv + argc, "-y");
   char *iterations_str = getCmdOption(argv, argv + argc, "-i");
   char *seed_str = getCmdOption(argv, argv + argc, "-s");
   char *runs_str = getCmdOption(argv, argv + argc, "-r");
   char *alg_str = getCmdOption(argv, argv + argc, "-a");
-  std::string algorithms = "RNWCB";
+  std::string algorithms = "RNWDCB";
 
   for (int i = 0; i < argc; ++i)
     std::cout << argv[i] << " ";
@@ -569,6 +695,8 @@ int main(int argc, char *argv[])
   }
   if (clusters_str)
     clusters = atoi(clusters_str);
+  if (ages_str)
+    ages = atoi(ages_str);
   if (neighbors_str)
     neighbors = atoi(neighbors_str);
   if (iterations_str)
@@ -582,6 +710,6 @@ int main(int argc, char *argv[])
   if(cmdOptionExists(argv, argv+argc, "-v"))
     verbose = true;
 
-  run_tests(population, clusters, neighbors, iterations,
+  run_tests(population, clusters, ages, neighbors, iterations,
 	    seed, runs, std::string(algorithms), verbose);
 }
