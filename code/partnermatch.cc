@@ -1,3 +1,4 @@
+
 /* Code to test partner matching algorithms.
    Copyright (C) Nathan Geffen.
    See LICENSE file for copyright details.
@@ -6,6 +7,8 @@
 #include <cassert>
 #include <cfloat>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 
 #include <algorithm>
 #include <array>
@@ -16,6 +19,8 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+
+#include <boost/lexical_cast.hpp>
 
 #define MALE 0
 #define FEMALE 1
@@ -47,11 +52,13 @@ struct InitialVals {
   double tightness_factor = 1.0;
   double distance_factor = 0.1;
   double previous_partner_factor = 500.0;
+  double attractor_factor = 0.5;
+  double rejector_factor = 0.5;
 };
 
 /*
   Table needed by Distribution Match
- */
+*/
 
 struct Table {
   size_t start;
@@ -89,7 +96,7 @@ void dist_sort (RandomAccessIterator first, RandomAccessIterator last,
 #define SEXOR_DIM 2
 #define NUM_BUCKETS (DOB_DIM * SEX_DIM * SEXOR_DIM)
 
-#define GET_BUCKET(age, sex, sexor)		\
+#define GET_BUCKET(age, sex, sexor)			\
   (SEX_DIM * sex + SEXOR_DIM * sexor + (age - MIN_AGE))
 
 class Agent {
@@ -112,6 +119,8 @@ public:
     hetero = uni(initial_vals_.rng) < initial_vals_.prob_hetero ? 1.0 : 0.0;
     x_coord = uni_x(initial_vals_.rng);
     y_coord = uni_y(initial_vals_.rng);
+    attractor = uni(initial_vals_.rng);
+    rejector = uni(initial_vals_.rng);
   }
 
   /* Standard euclidean plane distance function. */
@@ -122,6 +131,22 @@ public:
     return std::sqrt(x_d * x_d + y_d * y_d);
   }
 
+
+#ifdef ATTRACT_REJECT
+  double distance(const Agent &a, unsigned partner_count = 0)
+  {
+    double attraction = initial_vals_.attractor_factor *
+      fabs(attractor - a.attractor);
+    double rejection = initial_vals_.rejector_factor *
+      fabs((rejector - (1.0 - a.rejector)));
+    return attraction + rejection;
+  }
+  double cluster_value()
+  {
+    return attractor;
+  }
+
+#else
   /* This determines the suitability of a partnership between
      two agents. The smaller the value returned the more
      suitable the partnership. This and the cluster function
@@ -145,24 +170,25 @@ public:
       orientation_diff = initial_vals_.orientation_factor * (hetero + a.hetero);
     else
       orientation_diff = initial_vals_.orientation_factor *
-	((1.0 - hetero) + (1.0 - a.hetero));
+				       ((1.0 - hetero) + (1.0 - a.hetero));
     tightness_diff = initial_vals_.tightness_factor * (tightness - a.tightness);
     distance_diff = initial_vals_.distance_factor * euclidean_distance(a);
 
     return fabs(age_diff) + fabs(orientation_diff) +
-      fabs(tightness_diff) + fabs(distance_diff) + prev_partner;
+				       fabs(tightness_diff) + fabs(distance_diff) + prev_partner;
   }
 
 
   /* Function used to cluster agents with similar attributes
      close to each other.
-   */
+  */
   double cluster_value()
   {
     return initial_vals_.age_factor * dob +
       initial_vals_.orientation_factor * hetero +
       initial_vals_.tightness_factor * tightness;
   }
+#endif
 
   unsigned id;
   unsigned sex;
@@ -176,6 +202,8 @@ public:
   double x_coord;
   double y_coord;
   double weight;
+  double attractor;
+  double rejector;
   std::vector<Agent* > partners;
 };
 
@@ -196,7 +224,11 @@ public:
   InitialVals &initial_vals;
   std::vector<Agent *> agents;
   unsigned iteration = 0;
+#ifdef ATTRACT_REJECT
+  std::vector<double> positions;
+#else
   std::vector<unsigned> positions;
+#endif
 
   Simulation(InitialVals &initial_vals_parm) : initial_vals(initial_vals_parm)
   {}
@@ -230,6 +262,7 @@ public:
     iteration = 1;
   }
 
+
   /* Rank the suitability of a partnership. Used as the quality
      measure when comparing partner matching algorithms.
   */
@@ -251,7 +284,7 @@ public:
   /* Given two iterators into the agent vector, finds
      the most suitable partner to the element pointed
      to by the from iterator, but before the to iterator.
-   */
+  */
 
   std::vector<Agent *>::iterator
   closest_pair_match(std::vector<Agent *>::iterator from,
@@ -294,6 +327,38 @@ public:
       }
     }
     return closest_agent;
+  }
+
+
+  /* Write out all partner comparisons to graph file. */
+
+  void make_graph_all_partners(const char *graph)
+  {
+    FILE *f = fopen(graph, "w");
+    FILE *g = fopen("graph.csv", "w");
+    unsigned vertices = (unsigned) agents.size();
+    unsigned edges = vertices * (vertices - 1) / 2;
+    fprintf(f, "%u %d\n", vertices, edges);
+    for (unsigned i = 0; i < agents.size(); ++i) {
+      for (unsigned j = i + 1; j < agents.size(); ++j) {
+        double d = agents[i]->distance(*agents[j]);
+        fprintf(f, "%d %d %.0f\n", i, j, d * 10000000);
+        fprintf(g, "%d %d %.7f\n", i, j, d);
+      }
+    }
+    fclose(g);
+    fclose(f);
+  }
+
+  /* Write out all partners in CSV format */
+  void write_partners(const char* outfile)
+  {
+    FILE *f = fopen(outfile, "w");
+    for (auto& a: agents) {
+      double d = a->distance(*(a->partners.back()));
+      fprintf(f, "%d,%d,%.6f\n", a->id,a->partners.back()->id, d);
+    }
+    fclose(f);
   }
 
   /* Reference partner matching algorithm: Brute force.
@@ -401,6 +466,7 @@ public:
   void
   distribution_match(int ages, unsigned neighbors)
   {
+    unsigned k = neighbors / (ages + 1);
     std::shuffle(agents.begin(), agents.end(), initial_vals.rng);
     // Make a copy of the agent **POINTERS** - O(n)
     std::vector<Agent *>  copy_agents(agents.size());
@@ -436,7 +502,7 @@ public:
 	auto start_index = table[bucket].start;
 	size_t last_entry = table[bucket].start + table[bucket].entries;
 	size_t last_index = std::min(std::min(last_entry,
-					      start_index + neighbors),
+					      start_index + k),
 				     agents.size());
 	for (size_t i = start_index; i < last_index; ++i) {
 	  if (agent == copy_agents[i]) continue;
@@ -466,7 +532,11 @@ public:
   double
   calc_avg_match()
   {
+#ifdef ATTRACT_REJECT
+    double total = 0.0;
+#else
     unsigned total = 0;
+#endif
     unsigned partnerships = 0;
     unsigned samesex = 0;
     //std::vector<unsigned> positions;
@@ -483,9 +553,15 @@ public:
 	assert(a->partners.back()->partners.back() == a);
 	++partnerships;
 	if (a->sex == a->partners.back()->sex) ++samesex;
+#ifdef ATTRACT_REJECT
+        double distance = a->distance(*a->partners.back());
+        total += distance;
+        positions.push_back(distance);
+#else
 	unsigned position = find_partner_rank(a);
 	positions.push_back(position);
 	total += position;
+#endif
       }
     }
     if (initial_vals.verbose) {
@@ -627,21 +703,30 @@ void run_tests(std::size_t population = 16,
 	       unsigned clusters = 4,
 	       int ages = 4,
 	       unsigned neighbors = 2,
+	       double attractor_factor = 0.5,
+	       double rejector_factor = 0.5,
 	       unsigned iterations = 1,
 	       unsigned seed = 0,
 	       unsigned runs = 1,
 	       std::string algorithms = std::string("RNWCB"),
+               const char *graph = NULL,
+               const char *outfile = NULL,
+               bool run_blossom = false,
 	       bool verbose = true)
 {
   InitialVals initial_vals;
 
   initial_vals.verbose = verbose;
   initial_vals.rng.seed(seed);
+  initial_vals.attractor_factor = attractor_factor;
+  initial_vals.rejector_factor = rejector_factor;
 
   if (verbose) {
     std::cout << "Population: " << population << std::endl;
     std::cout << "Clusters: " << clusters << std::endl;
     std::cout << "Neighbors: " << neighbors << std::endl;
+    std::cout << "Attractor factor: " << attractor_factor << std::endl;
+    std::cout << "Rejector factor: " << rejector_factor << std::endl;
   }
 
   for (unsigned i = 0; i < runs; ++i) {
@@ -651,10 +736,10 @@ void run_tests(std::size_t population = 16,
       stats(s, "Random match", [&](){s.random_match();}, iterations, i);
     if (algorithms.find("N") != std::string::npos)
       stats(s, "Random match n", [&](){s.random_match_n(neighbors);},
-	  iterations, i);
+	    iterations, i);
     if (algorithms.find("W") != std::string::npos)
       stats(s, "Weighted shuffle", [&](){s.weighted_shuffle_match(neighbors); },
-	  iterations, i);
+	    iterations, i);
     if (algorithms.find("C") != std::string::npos)
       stats(s, "Cluster shuffle", [&](){
 	  s.cluster_shuffle_match(clusters, neighbors);
@@ -665,6 +750,24 @@ void run_tests(std::size_t population = 16,
 	}, iterations, i);
     if (algorithms.find("B") != std::string::npos)
       stats(s, "Brute force", [&](){s.brute_force_match();}, iterations, i);
+    if (graph) {
+      s.make_graph_all_partners(graph);
+      if (run_blossom) {
+        std::string command("./blossom5 -e ");
+        command += std::string(graph);
+        command +=  std::string(" -w output.txt | tail -n 1 | awk '{avg = $3 / 10000000.0 / ");
+        command += boost::lexical_cast<std::string>(population / 2);
+        command += std::string("; print avg}'");
+        printf("%d, Blossom5, %d, mean, ", i, 0);
+        fflush(stdout);
+        if(system(command.c_str()) != 0) {
+          std::cerr << "Error executing Blossom5." << std::endl;
+          exit(1);
+        }
+      }
+    }
+    if (outfile)
+      s.write_partners(outfile);
   }
 }
 
@@ -672,7 +775,10 @@ int main(int argc, char *argv[])
 {
   unsigned population = 16, clusters = 4, neighbors = 2,
     seed = 0, iterations = 1, runs = 1, ages = 5;
-  bool verbose = false;
+  bool verbose = false, run_blossom = false;
+  double attractor_factor = 0.5;
+  double rejector_factor = 0.5;
+
   char *population_str = getCmdOption(argv, argv + argc, "-p");
   char *neighbors_str = getCmdOption(argv, argv + argc, "-n");
   char *clusters_str = getCmdOption(argv, argv + argc, "-c");
@@ -681,6 +787,10 @@ int main(int argc, char *argv[])
   char *seed_str = getCmdOption(argv, argv + argc, "-s");
   char *runs_str = getCmdOption(argv, argv + argc, "-r");
   char *alg_str = getCmdOption(argv, argv + argc, "-a");
+  char *attractor_str = getCmdOption(argv, argv + argc, "-A");
+  char *rejector_str = getCmdOption(argv, argv + argc, "-R");
+  char *graph_str = getCmdOption(argv, argv + argc, "-g");
+  char *out_str =  getCmdOption(argv, argv + argc, "-o");
   std::string algorithms = "RNWDCB";
 
   for (int i = 0; i < argc; ++i)
@@ -707,9 +817,24 @@ int main(int argc, char *argv[])
     runs = atoi(runs_str);
   if (alg_str)
     algorithms = alg_str;
+  if (attractor_str)
+    attractor_factor = atof(attractor_str);
+  if (rejector_str)
+    rejector_factor = atof(rejector_str);
+
   if(cmdOptionExists(argv, argv+argc, "-v"))
     verbose = true;
+  if(cmdOptionExists(argv, argv+argc, "-b"))
+    run_blossom = true;
 
-  run_tests(population, clusters, ages, neighbors, iterations,
-	    seed, runs, std::string(algorithms), verbose);
+
+#ifdef ATTRACT_REJECT
+  printf("Compiled with ATTRACT_REJECT on\n");
+#else
+  printf("Compiled with ATTRACT_REJECT off\n");
+#endif
+
+  run_tests(population, clusters, ages, neighbors,
+	    attractor_factor, rejector_factor, iterations,
+	    seed, runs, std::string(algorithms), graph_str, out_str, run_blossom, verbose);
 }
