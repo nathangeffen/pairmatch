@@ -1,3 +1,5 @@
+// TO DO WHY IS distance(a,b) not returning exactly same as distance(b, a)?
+
 
 /* Code to test partner matching algorithms.
    Copyright (C) Nathan Geffen.
@@ -6,6 +8,7 @@
 
 #include <cassert>
 #include <cfloat>
+#include <climits>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -27,10 +30,10 @@
 #define MIN_AGE 10
 #define MAX_AGE 100
 
-#define GRAPH_ACCURACY 10000000
+#define GRAPH_ACCURACY 10000
 
 struct Effectiveness {
-  unsigned avg_rank = 0;
+  uint64_t avg_rank = 0;
   double avg_distance = 0.0;
 };
 
@@ -51,7 +54,7 @@ struct InitialVals {
   double dob_range = 10.0;
   double max_x_coord = 10.0;
   double max_y_coord = 10.0;
-  unsigned last_agent = 0;
+  uint64_t last_agent = 0;
   bool verbose = false;
 
   // proportions for distance calc
@@ -81,18 +84,18 @@ struct Table {
 template <class RandomAccessIterator, class GetBucket>
 void dist_sort (RandomAccessIterator first, RandomAccessIterator last,
 		RandomAccessIterator out,
-		const unsigned lo, const unsigned hi,
+		const uint64_t lo, const uint64_t hi,
 		GetBucket getBucket)
 {
-  std::vector<unsigned> D(hi - lo + 1, 0);
+  std::vector<uint64_t> D(hi - lo + 1, 0);
   for (auto it = first; it != last; ++it) {
-    unsigned bucket = getBucket(*it);
+    uint64_t bucket = getBucket(*it);
     ++D[bucket - lo];
   }
-  for (unsigned j = 1; j < D.size(); ++j)
+  for (uint64_t j = 1; j < D.size(); ++j)
     D[j] = D[j - 1] + D[j];
   for (auto it = last - 1; it >= first; --it) {
-    unsigned j = getBucket(*it) - lo;
+    uint64_t j = getBucket(*it) - lo;
     *(out + D[j] - 1) = *it;
     --D[j];
   }
@@ -111,7 +114,7 @@ class Agent {
 public:
   InitialVals &initial_vals_;
   Agent(InitialVals &initial_vals) : initial_vals_(initial_vals) {
-    std::uniform_int_distribution<int> uni_age(0,(unsigned)
+    std::uniform_int_distribution<int> uni_age(0,(uint64_t)
 					       initial_vals_.dob_range);
     std::uniform_real_distribution<double> uni;
     std::uniform_real_distribution<double> uni_x(0, initial_vals_.max_x_coord);
@@ -141,7 +144,7 @@ public:
 
 
 #ifdef ATTRACT_REJECT
-  double distance(const Agent &a, unsigned partner_count = 0)
+  double distance(const Agent &a, uint64_t partner_count = 0)
   {
     double attraction = initial_vals_.attractor_factor *
       fabs(attractor - a.attractor);
@@ -160,7 +163,7 @@ public:
      suitable the partnership. This and the cluster function
      are the only domain specific code here.
   */
-  double distance(const Agent &a, unsigned partner_count = 0)
+  double distance(const Agent &a, uint64_t partner_count = 0)
   {
     double prev_partner;
     double age_diff;
@@ -198,8 +201,8 @@ public:
   }
 #endif
 
-  unsigned id;
-  unsigned sex;
+  uint64_t id;
+  uint64_t sex;
   int dob;
   double tightness;
   double hetero;
@@ -216,9 +219,9 @@ public:
 };
 
 /* Needed by distribution match */
-unsigned get_bucket(const Agent* a)
+uint64_t get_bucket(const Agent* a)
 {
-  unsigned age = a->initial_vals_.current_date - a->dob;
+  uint64_t age = a->initial_vals_.current_date - a->dob;
   return GET_BUCKET(age, a->sex, a->hetero);
 }
 
@@ -231,9 +234,9 @@ class Simulation {
 public:
   InitialVals &initial_vals;
   std::vector<Agent *> agents;
-  unsigned iteration = 0;
+  uint64_t iteration = 0;
   std::vector<double> distances;
-  std::vector<unsigned> positions;
+  std::vector<uint64_t> positions;
 
 
   Simulation(InitialVals &initial_vals_parm) : initial_vals(initial_vals_parm)
@@ -273,10 +276,10 @@ public:
      measure when comparing partner matching algorithms.
   */
 
-  unsigned
+  uint64_t
   find_partner_rank(Agent *agent, Agent *partner = NULL)
   {
-    unsigned position = 0;
+    uint64_t position = 0;
     double d;
     if (partner == NULL) {
       partner = agent->partners.back();
@@ -325,12 +328,12 @@ public:
   std::vector<Agent *>::iterator
   closest_pair_match_n(std::vector<Agent *>::iterator from,
 		       std::vector<Agent *>::iterator to,
-		       unsigned n)
+		       uint64_t n)
   {
     double smallest_val = DBL_MAX;
     std::vector<Agent *>::iterator closest_agent = to;
 
-    unsigned j = 0;
+    uint64_t j = 0;
     for (auto it = from + 1; j < n && it != to; ++it) {
       if ( (*it)->partners.size() < iteration) {
 	double distance = (*from)->distance(**it);
@@ -350,18 +353,16 @@ public:
   void make_graph_all_partners(const char *graph)
   {
     FILE *f = fopen(graph, "w");
-    FILE *g = fopen("graph.csv", "w");
-    unsigned vertices = (unsigned) agents.size();
-    unsigned edges = vertices * (vertices - 1) / 2;
-    fprintf(f, "%u %d\n", vertices, edges);
-    for (unsigned i = 0; i < agents.size(); ++i) {
-      for (unsigned j = i + 1; j < agents.size(); ++j) {
-        double d = agents[i]->distance(*agents[j], 1);
-        fprintf(f, "%d %d %.0f\n", i, j, d * GRAPH_ACCURACY);
-        fprintf(g, "%d %d %.7f\n", i, j, d);
+
+    uint64_t vertices = (uint64_t) agents.size();
+    uint64_t edges = vertices * (vertices - 1) / 2;
+    fprintf(f, "%lu %lu\n", vertices, edges);
+    for (uint64_t i = 0; i < agents.size(); ++i) {
+      for (uint64_t j = i + 1; j < agents.size(); ++j) {
+        double d = agents[i]->distance(*agents[j], 0);
+        fprintf(f, "%lu %lu %.0f\n", i, j, d * GRAPH_ACCURACY);
       }
     }
-    fclose(g);
     fclose(f);
   }
 
@@ -371,7 +372,7 @@ public:
     FILE *f = fopen(outfile, "w");
     for (auto& a: agents) {
       double d = a->distance(*(a->partners.back()));
-      fprintf(f, "%d,%d,%.6f\n", a->id,a->partners.back()->id, d);
+      fprintf(f, "%lu,%lu,%.6f\n", a->id,a->partners.back()->id, d);
     }
     fclose(f);
   }
@@ -391,6 +392,13 @@ public:
 	}
       }
     }
+    // DEBUGGING
+    // FILE *f = fopen("tmp_bf.csv", "w");
+    // for (auto & agent: agents) {
+    //   fprintf(f, "%lu,%lu,%.2f\n", agent->id, agent->partners.back()->id,
+    //           agent->distance(*agent->partners.back(),1));
+    // }
+    // fclose(f);
   }
 
   /* Reference partner matching algorithm: Random match. */
@@ -407,7 +415,7 @@ public:
 
   /* Random match k algorithm. */
 
-  void random_match_n(unsigned neighbors)
+  void random_match_n(uint64_t neighbors)
   {
     std::uniform_real_distribution<double> uni;
     std::shuffle(agents.begin(), agents.end(), initial_vals.rng);
@@ -426,7 +434,7 @@ public:
 
 
   /* Weighted shuffle algorithm. */
-  void weighted_shuffle_match(unsigned neighbors)
+  void weighted_shuffle_match(uint64_t neighbors)
   {
     std::uniform_real_distribution<double> uni;
     for (auto & agent: agents) agent->weight =
@@ -449,14 +457,14 @@ public:
   /* Cluster shuffle algorithm. */
 
   void
-  cluster_shuffle_match(unsigned clusters,
-			unsigned neighbors)
+  cluster_shuffle_match(uint64_t clusters,
+			uint64_t neighbors)
   {
-    unsigned cluster_size = agents.size() / clusters;
+    uint64_t cluster_size = agents.size() / clusters;
     for (auto &a : agents) a->weight = a->cluster_value();
     sort(agents.rbegin(), agents.rend(), [](Agent *a, Agent *b)
 	 { return a->weight < b->weight; });
-    for (unsigned i = 0; i < clusters; ++i) {
+    for (uint64_t i = 0; i < clusters; ++i) {
       auto first = agents.begin() + i * cluster_size;
       auto last = first + cluster_size;
       if (last > agents.end()) last = agents.end();
@@ -479,10 +487,10 @@ public:
   /* Distribution match */
 
   void
-  distribution_match(int ages, unsigned neighbors)
+  distribution_match(int ages, uint64_t neighbors)
   {
     std::vector<Agent *> unmatched;
-    unsigned k = neighbors / (ages + 1);
+    uint64_t k = neighbors / (ages + 1);
     std::shuffle(agents.begin(), agents.end(), initial_vals.rng);
     // Make a copy of the agent **POINTERS** - O(n)
     std::vector<Agent *>  copy_agents(agents.size());
@@ -510,10 +518,10 @@ public:
       size_t best_last_entry = agents.size();
       size_t best_index = agents.size();
       for (int j = -ages; j < ages; ++j) {
-	unsigned pdob = (unsigned) agent->initial_vals_.current_date -
+	uint64_t pdob = (uint64_t) agent->initial_vals_.current_date -
 	  agent->dob  + j;
-	unsigned psex = (agent->hetero == 1.0) ? (!agent->sex) : agent->sex;
-	unsigned psexor = (unsigned) agent->hetero;
+	uint64_t psex = (agent->hetero == 1.0) ? (!agent->sex) : agent->sex;
+	uint64_t psexor = (uint64_t) agent->hetero;
 	size_t bucket = GET_BUCKET(pdob, psex, psexor);
 	auto start_index = table[bucket].start;
 	size_t last_entry = table[bucket].start + table[bucket].entries;
@@ -561,21 +569,66 @@ public:
     }
   }
 
+  void blossom()
+  {
+    sort(agents.begin(), agents.end(), [&](Agent *a, Agent *b)
+         {
+           return a->id < b->id;
+         });
+    make_graph_all_partners("graph.csv");
+    std::string command("./blossom5 -e graph.csv");
+    command +=  std::string(" -w output.txt | tail -n 1 | awk '{avg = $3 / ");
+    command += boost::lexical_cast<std::string>(GRAPH_ACCURACY);
+    command += std::string( " / ");
+    command += boost::lexical_cast<std::string>(agents.size() / 2);
+    command += std::string("; print avg}'");
+    printf("Blossom V command line, mean distance, ");
+    fflush(stdout);
+    if(system(command.c_str()) != 0) {
+      std::cerr << "Error executing Blossom V." << std::endl;
+      exit(1);
+    }
+    FILE *f = fopen("output.txt", "r");
+    uint64_t from, to;
+    if (fscanf(f, "%lu %lu\n", &from, &to) != 2) {
+      fprintf(stderr, "Error reading graph file.\n");
+      exit(1);
+    }
+    for (size_t i = 0; i < agents.size() / 2; ++i) {
+      if (fscanf(f, "%lu %lu\n", &from, &to) != 2) {
+        fprintf(stderr, "Error reading graph file.\n");
+        exit(1);
+      }
+      agents[from]->partners.push_back(agents[to]);
+      agents[to]->partners.push_back(agents[from]);
+    }
+    fclose(f);
+    // DEBUGGING
+    // f = fopen("tmp_bl.csv", "w");
+    // for (auto & agent: agents) {
+    //   fprintf(f, "%lu,%lu,%.2f\n", agent->id, agent->partners.back()->id,
+    //           agent->distance(*agent->partners.back(),1));
+    // }
+    // fclose(f);
+  }
+
+
+
   /* Statistical and timing functions. */
 
   Effectiveness
   calc_avg_match(bool calc_rank=true, bool calc_distance=true)
   {
     Effectiveness effectiveness;
-    unsigned partnerships = 0;
-    unsigned samesex = 0;
-    unsigned denom = agents.size();
+    uint64_t partnerships = 0;
+    uint64_t samesex = 0;
+    uint64_t denom = agents.size();
     positions.clear();
     distances.clear();
 
     for (auto & a: agents) {
       if (a->partners.size() < iteration) {
-	printf("Warning unmatched: %d\n", a->id);
+	printf("Warning unmatched: %lu\n", a->id);
 	--denom;
       } else {
 	assert(a->partners.back());
@@ -590,7 +643,7 @@ public:
           effectiveness.avg_distance += distance;
         }
         if (calc_rank) {
-          unsigned position = find_partner_rank(a);
+          uint64_t position = find_partner_rank(a);
           positions.push_back(position);
           effectiveness.avg_rank += position;
         }
@@ -602,8 +655,8 @@ public:
       std::cout << "Number of agents without partners: "
 		<< agents.size() - denom << std::endl;
     }
-    effectiveness.avg_distance /= denom / 2;
-    effectiveness.avg_rank /= denom / 2;
+    effectiveness.avg_distance /= denom;
+    effectiveness.avg_rank /= denom;
     return effectiveness;
   }
 };
@@ -670,14 +723,14 @@ med_iqr(InputIterator  from, InputIterator to, bool sorted = false)
 
 void
 stats(Simulation &s, const char *description,
-      std::function<void(void)> func, unsigned iterations = 1, unsigned run = 0,
-      bool avg_ranking = true, bool avg_distance = false,
+      std::function<void(void)> func, uint64_t iterations = 1, uint64_t run = 0,
+      bool avg_ranking = true, bool avg_distance = true,
       bool timings_only = false)
 {
   Effectiveness effectiveness;
 
   s.reset();
-  for (unsigned i = 0; i < iterations; ++i, ++s.iteration) {
+  for (uint64_t i = 0; i < iterations; ++i, ++s.iteration) {
     auto start = std::chrono::system_clock::now();
     func();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>
@@ -761,16 +814,15 @@ bool cmdOptionExists(char** begin, char** end, const std::string& option)
 /////////////////////////////////
 
 void run_tests(std::size_t population = 16,
-	       unsigned clusters = 4,
+	       uint64_t clusters = 4,
 	       int ages = 4,
-	       unsigned neighbors = 2,
+	       uint64_t neighbors = 2,
 	       double attractor_factor = 0.5,
 	       double rejector_factor = 0.5,
-	       unsigned iterations = 1,
-	       unsigned seed = 0,
-	       unsigned runs = 1,
+	       uint64_t iterations = 1,
+	       uint64_t seed = 0,
+	       uint64_t runs = 1,
 	       std::string algorithms = std::string("RNWCB"),
-               const char *graph = NULL,
                const char *outfile = NULL,
                bool run_blossom = false,
                bool timings_only = false,
@@ -791,78 +843,32 @@ void run_tests(std::size_t population = 16,
     std::cout << "Rejector factor: " << rejector_factor << std::endl;
   }
 
-  for (unsigned i = 0; i < runs; ++i) {
+  for (uint64_t i = 0; i < runs; ++i) {
     Simulation s(initial_vals);
     s.init_population(population);
     if (algorithms.find("R") != std::string::npos)
       stats(s, "Random match", [&](){s.random_match();},
-            iterations, i, true, run_blossom, timings_only);
+            iterations, i, true, true, timings_only);
     if (algorithms.find("N") != std::string::npos)
       stats(s, "Random match n", [&](){s.random_match_n(neighbors);},
-	    iterations, i, true, run_blossom, timings_only);
+	    iterations, i, true, true, timings_only);
     if (algorithms.find("W") != std::string::npos)
       stats(s, "Weighted shuffle", [&](){s.weighted_shuffle_match(neighbors); },
-	    iterations, i, true, run_blossom, timings_only);
+	    iterations, i, true, true, timings_only);
     if (algorithms.find("C") != std::string::npos)
       stats(s, "Cluster shuffle", [&](){
 	  s.cluster_shuffle_match(clusters, neighbors);
-	}, iterations, i, true, run_blossom, timings_only);
+	}, iterations, i, true, true, timings_only);
     if (algorithms.find("D") != std::string::npos)
       stats(s, "Distribution match", [&](){
 	  s.distribution_match(ages, neighbors);
-	}, iterations, i, true, run_blossom, timings_only);
+	}, iterations, i, true, true, timings_only);
     if (algorithms.find("B") != std::string::npos)
       stats(s, "Brute force", [&](){s.brute_force_match();},
-            iterations, i, true, run_blossom, timings_only);
-    if (graph) {
-      sort(s.agents.begin(), s.agents.end(), [&](Agent *a, Agent *b)
-           {
-             return a->id < b->id;
-           });
-      s.make_graph_all_partners(graph);
-      if (run_blossom) {
-        std::string command("./blossom5 -e ");
-        command += std::string(graph);
-        command +=  std::string(" -w output.txt | tail -n 1 | awk '{avg = $3 / ");
-        command += boost::lexical_cast<std::string>(GRAPH_ACCURACY);
-        command += std::string( " / ");
-        command += boost::lexical_cast<std::string>(population / 2);
-        command += std::string("; print avg}'");
-        printf("%d, Blossom5, %d, mean distance, ", i, 0);
-        fflush(stdout);
-        if(system(command.c_str()) != 0) {
-          std::cerr << "Error executing Blossom5." << std::endl;
-          exit(1);
-        }
-        // Get mean of Blossom5 rank
-        FILE *f = fopen("output.txt", "r");
-        unsigned from, to;
-        s.positions.clear();
-        unsigned avg_rank = 0;
-        fscanf(f, "%u %u\n", &from, &to);
-        for (size_t i = 0; i < population / 2; ++i) {
-          fscanf(f, "%u %u\n", &from, &to);
-          unsigned r = s.find_partner_rank(s.agents[from],
-                                           s.agents[to]);
-          s.positions.push_back(r);
-          avg_rank += r;
-        }
-        printf("%d, Blossom5, %d, mean rank, %.2f\n", i, 0,
-               (double) avg_rank / (population / 2));
-        {
-          auto statistics = med_iqr(s.positions.begin(), s.positions.end());
-          printf("%d, Blossom5, %d, median rank, %.2f\n", i, 0,
-                 statistics[1]);
-          printf("%d, Blossom5, %d, 25%% rank, %.2f\n", i, 0,
-                 statistics[0]);
-          printf("%d, Blossom5, %d, 75%% rank, %.2f\n", i, 0,
-                 statistics[2]);
-          auto st = stddev(s.positions.begin(), s.positions.end(),
-                           (double) avg_rank / (population / 2));
-          printf("%d, Blossom5, %d, stddev rank, %.2f\n", i, 0, st);
-        }
-        fclose(f);
-      }
+            iterations, i, true, true, timings_only);
+    if (run_blossom) {
+      stats(s, "Blossom V", [&](){s.blossom();},
+            iterations, i, true, true, timings_only);
     }
     if (outfile)
       s.write_partners(outfile);
@@ -871,7 +877,7 @@ void run_tests(std::size_t population = 16,
 
 int main(int argc, char *argv[])
 {
-  unsigned population = 16, clusters = 4, neighbors = 2,
+  uint64_t population = 16, clusters = 4, neighbors = 2,
     seed = 0, iterations = 1, runs = 1, ages = 5;
   bool verbose = false, run_blossom = false, timings_only = false;
   double attractor_factor = 0.5;
@@ -887,7 +893,6 @@ int main(int argc, char *argv[])
   char *alg_str = getCmdOption(argv, argv + argc, "-a");
   char *attractor_str = getCmdOption(argv, argv + argc, "-A");
   char *rejector_str = getCmdOption(argv, argv + argc, "-R");
-  char *graph_str = getCmdOption(argv, argv + argc, "-g");
   char *out_str =  getCmdOption(argv, argv + argc, "-o");
   std::string algorithms = "RNWDCB";
 
@@ -927,15 +932,13 @@ int main(int argc, char *argv[])
   if(cmdOptionExists(argv, argv+argc, "-t"))
     timings_only = true;
 
-
 #ifdef ATTRACT_REJECT
   printf("Compiled with ATTRACT_REJECT on\n");
 #else
   printf("Compiled with ATTRACT_REJECT off\n");
 #endif
-
   run_tests(population, clusters, ages, neighbors,
 	    attractor_factor, rejector_factor, iterations,
-	    seed, runs, std::string(algorithms), graph_str, out_str,
+	    seed, runs, std::string(algorithms), out_str,
             run_blossom, timings_only, verbose);
 }
