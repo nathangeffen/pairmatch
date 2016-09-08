@@ -5,7 +5,7 @@ CXX = g++
 #  -g    adds debugging information to the executable file
 #  -Wall turns on most, but not all, compiler warnings
 CXXFLAGS  = -g -Wall -std=c++11
-RELFLAGS = -O5 -std=c++11
+RELFLAGS = -O3 -std=c++11
 EXTRAFLAGS =
 
 # the build target executable:

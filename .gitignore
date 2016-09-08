@@ -13,4 +13,7 @@ a.out
 *.Rproj
 output*.csv
 blossom5-v1.0.src/
+partnermatch
+graph.txt
+output.txt
 

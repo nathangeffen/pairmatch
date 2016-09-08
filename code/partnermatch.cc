@@ -27,6 +27,14 @@
 #define MIN_AGE 10
 #define MAX_AGE 100
 
+#define GRAPH_ACCURACY 10000000
+
+struct Effectiveness {
+  unsigned avg_rank = 0;
+  double avg_distance = 0.0;
+};
+
+
 class Agent;
 
 /* Parameters for the simulation are encapsulated in this struct. */
@@ -192,7 +200,7 @@ public:
 
   unsigned id;
   unsigned sex;
-  unsigned dob;
+  int dob;
   double tightness;
   double hetero;
   bool hiv_pos;
@@ -224,11 +232,9 @@ public:
   InitialVals &initial_vals;
   std::vector<Agent *> agents;
   unsigned iteration = 0;
-#ifdef ATTRACT_REJECT
-  std::vector<double> positions;
-#else
+  std::vector<double> distances;
   std::vector<unsigned> positions;
-#endif
+
 
   Simulation(InitialVals &initial_vals_parm) : initial_vals(initial_vals_parm)
   {}
@@ -268,12 +274,21 @@ public:
   */
 
   unsigned
-  find_partner_rank(Agent *agent)
+  find_partner_rank(Agent *agent, Agent *partner = NULL)
   {
     unsigned position = 0;
-    double d = agent->distance(*agent->partners.back(), 1);
+    double d;
+    if (partner == NULL) {
+      partner = agent->partners.back();
+      d = agent->distance(*partner, 1);
+    } else {
+      if (partner == agent->partners.back())
+        d = agent->distance(*partner, 1);
+      else
+        d = agent->distance(*partner, 0);
+    }
     for (auto & a : agents) {
-      if (a != agent && a != agent->partners.back()) {
+      if (a != agent && a != partner) {
 	double x = agent->distance(*a);
 	if (x < d) ++position;
       }
@@ -341,8 +356,8 @@ public:
     fprintf(f, "%u %d\n", vertices, edges);
     for (unsigned i = 0; i < agents.size(); ++i) {
       for (unsigned j = i + 1; j < agents.size(); ++j) {
-        double d = agents[i]->distance(*agents[j]);
-        fprintf(f, "%d %d %.0f\n", i, j, d * 10000000);
+        double d = agents[i]->distance(*agents[j], 1);
+        fprintf(f, "%d %d %.0f\n", i, j, d * GRAPH_ACCURACY);
         fprintf(g, "%d %d %.7f\n", i, j, d);
       }
     }
@@ -466,6 +481,7 @@ public:
   void
   distribution_match(int ages, unsigned neighbors)
   {
+    std::vector<Agent *> unmatched;
     unsigned k = neighbors / (ages + 1);
     std::shuffle(agents.begin(), agents.end(), initial_vals.rng);
     // Make a copy of the agent **POINTERS** - O(n)
@@ -523,25 +539,39 @@ public:
 	best_partner->partners.push_back(agent);
 	std::swap(copy_agents[best_index], copy_agents[best_last_entry - 1]);
 	--table[best_bucket].entries;
+      } else {
+        // Can't match, so deal with as exception.
+        // This should happen very rarely.
+        unmatched.push_back(agent);
+      }
+    }
+    // Deal with the unmatched agents (there should be few of these)
+    if (unmatched.size() > 0) {
+      for (size_t i = 0; i < unmatched.size() - 1; ++i) {
+        if (unmatched[i]->partners.size() < iteration) {
+          for (size_t j = unmatched.size() - 1; j > i; --j) {
+            if (unmatched[j]->partners.size() < iteration) {
+              unmatched[i]->partners.push_back(unmatched[j]);
+              unmatched[j]->partners.push_back(unmatched[i]);
+              break;
+            }
+          }
+        }
       }
     }
   }
 
   /* Statistical and timing functions. */
 
-  double
-  calc_avg_match()
+  Effectiveness
+  calc_avg_match(bool calc_rank=true, bool calc_distance=true)
   {
-#ifdef ATTRACT_REJECT
-    double total = 0.0;
-#else
-    unsigned total = 0;
-#endif
+    Effectiveness effectiveness;
     unsigned partnerships = 0;
     unsigned samesex = 0;
-    //std::vector<unsigned> positions;
     unsigned denom = agents.size();
     positions.clear();
+    distances.clear();
 
     for (auto & a: agents) {
       if (a->partners.size() < iteration) {
@@ -553,15 +583,17 @@ public:
 	assert(a->partners.back()->partners.back() == a);
 	++partnerships;
 	if (a->sex == a->partners.back()->sex) ++samesex;
-#ifdef ATTRACT_REJECT
-        double distance = a->distance(*a->partners.back());
-        total += distance;
-        positions.push_back(distance);
-#else
-	unsigned position = find_partner_rank(a);
-	positions.push_back(position);
-	total += position;
-#endif
+
+        if (calc_distance) {
+          double distance = a->distance(*a->partners.back(), 1);
+          distances.push_back(distance);
+          effectiveness.avg_distance += distance;
+        }
+        if (calc_rank) {
+          unsigned position = find_partner_rank(a);
+          positions.push_back(position);
+          effectiveness.avg_rank += position;
+        }
       }
     }
     if (initial_vals.verbose) {
@@ -570,7 +602,9 @@ public:
       std::cout << "Number of agents without partners: "
 		<< agents.size() - denom << std::endl;
     }
-    return (double) total / denom;
+    effectiveness.avg_distance /= denom / 2;
+    effectiveness.avg_rank /= denom / 2;
+    return effectiveness;
   }
 };
 
@@ -636,9 +670,11 @@ med_iqr(InputIterator  from, InputIterator to, bool sorted = false)
 
 void
 stats(Simulation &s, const char *description,
-      std::function<void(void)> func, unsigned iterations = 1, unsigned run = 0)
+      std::function<void(void)> func, unsigned iterations = 1, unsigned run = 0,
+      bool avg_ranking = true, bool avg_distance = false,
+      bool timings_only = false)
 {
-  double mean;
+  Effectiveness effectiveness;
 
   s.reset();
   for (unsigned i = 0; i < iterations; ++i, ++s.iteration) {
@@ -650,26 +686,51 @@ stats(Simulation &s, const char *description,
     std::cout << run << ", " << description << ", " << i << ", algorithm time, "
 	      << duration.count() << std::endl;
 
-    start = std::chrono::system_clock::now();
-    mean = s.calc_avg_match();
-    duration = std::chrono::duration_cast<std::chrono::milliseconds>
-      (std::chrono::system_clock::now() - start);
+    if (timings_only == false) {
+      start = std::chrono::system_clock::now();
+      effectiveness = s.calc_avg_match(avg_ranking, avg_distance);
+      duration = std::chrono::duration_cast<std::chrono::milliseconds>
+        (std::chrono::system_clock::now() - start);
 
-    std::cout << run << ", " << description << ", " << i << ", ranker time, "
-	      << duration.count() << std::endl;
+      std::cout << run << ", " << description << ", " << i << ", ranker time, "
+                << duration.count() << std::endl;
 
-    std::cout << run << ", " << description  << ", " << i << ", mean, "
-	      << mean << std::endl;
-    auto statistics = med_iqr(s.positions.begin(), s.positions.end());
-    std::cout << run << ", " << description  << ", " << i << ", median, "
-	      << statistics[1] << std::endl;
-    std::cout << run << ", " << description  << ", " << i << ", 25%, "
-	      << statistics[0] << std::endl;
-    std::cout << run << ", " << description  << ", " << i << ", 75%, "
-	      << statistics[2] << std::endl;
-    auto st = stddev(s.positions.begin(), s.positions.end(), mean);
-    std::cout << run << ", " << description  << ", " << i << ", stddev, "
-	      << st << std::endl;
+      std::cout << run << ", " << description  << ", " << i << ", mean rank, "
+                << effectiveness.avg_rank << std::endl;
+      if (avg_ranking) {
+        auto statistics = med_iqr(s.positions.begin(), s.positions.end());
+        std::cout << run << ", " << description  << ", " << i << ", median rank, "
+                  << statistics[1] << std::endl;
+        std::cout << run << ", " << description  << ", " << i << ", 25% rank, "
+                  << statistics[0] << std::endl;
+        std::cout << run << ", " << description  << ", " << i << ", 75% rank, "
+                  << statistics[2] << std::endl;
+        auto st = stddev(s.positions.begin(), s.positions.end(),
+                         effectiveness.avg_rank);
+        std::cout << run << ", " << description  << ", " << i << ", stddev rank, "
+                  << st << std::endl;
+
+        std::cout << run << ", " << description  << ", " << i
+                  << ", mean distance, "
+                  << effectiveness.avg_distance << std::endl;
+      }
+      if (avg_distance) {
+        auto statistics = med_iqr(s.distances.begin(), s.distances.end());
+        std::cout << run << ", " << description  << ", " << i
+                  << ", median distance, "
+                  << statistics[1] << std::endl;
+        std::cout << run << ", " << description  << ", " << i
+                  << ", 25% distance, "
+                  << statistics[0] << std::endl;
+        std::cout << run << ", " << description  << ", " << i
+                  << ", 75% distance, "
+                  << statistics[2] << std::endl;
+        auto st = stddev(s.distances.begin(), s.distances.end(),
+                         effectiveness.avg_distance);
+        std::cout << run << ", " << description  << ", " << i << ", stddev rank, "
+                  << st << std::endl;
+      }
+    }
   }
 }
 
@@ -712,6 +773,7 @@ void run_tests(std::size_t population = 16,
                const char *graph = NULL,
                const char *outfile = NULL,
                bool run_blossom = false,
+               bool timings_only = false,
 	       bool verbose = true)
 {
   InitialVals initial_vals;
@@ -733,37 +795,73 @@ void run_tests(std::size_t population = 16,
     Simulation s(initial_vals);
     s.init_population(population);
     if (algorithms.find("R") != std::string::npos)
-      stats(s, "Random match", [&](){s.random_match();}, iterations, i);
+      stats(s, "Random match", [&](){s.random_match();},
+            iterations, i, true, run_blossom, timings_only);
     if (algorithms.find("N") != std::string::npos)
       stats(s, "Random match n", [&](){s.random_match_n(neighbors);},
-	    iterations, i);
+	    iterations, i, true, run_blossom, timings_only);
     if (algorithms.find("W") != std::string::npos)
       stats(s, "Weighted shuffle", [&](){s.weighted_shuffle_match(neighbors); },
-	    iterations, i);
+	    iterations, i, true, run_blossom, timings_only);
     if (algorithms.find("C") != std::string::npos)
       stats(s, "Cluster shuffle", [&](){
 	  s.cluster_shuffle_match(clusters, neighbors);
-	}, iterations, i);
+	}, iterations, i, true, run_blossom, timings_only);
     if (algorithms.find("D") != std::string::npos)
       stats(s, "Distribution match", [&](){
 	  s.distribution_match(ages, neighbors);
-	}, iterations, i);
+	}, iterations, i, true, run_blossom, timings_only);
     if (algorithms.find("B") != std::string::npos)
-      stats(s, "Brute force", [&](){s.brute_force_match();}, iterations, i);
+      stats(s, "Brute force", [&](){s.brute_force_match();},
+            iterations, i, true, run_blossom, timings_only);
     if (graph) {
+      sort(s.agents.begin(), s.agents.end(), [&](Agent *a, Agent *b)
+           {
+             return a->id < b->id;
+           });
       s.make_graph_all_partners(graph);
       if (run_blossom) {
         std::string command("./blossom5 -e ");
         command += std::string(graph);
-        command +=  std::string(" -w output.txt | tail -n 1 | awk '{avg = $3 / 10000000.0 / ");
+        command +=  std::string(" -w output.txt | tail -n 1 | awk '{avg = $3 / ");
+        command += boost::lexical_cast<std::string>(GRAPH_ACCURACY);
+        command += std::string( " / ");
         command += boost::lexical_cast<std::string>(population / 2);
         command += std::string("; print avg}'");
-        printf("%d, Blossom5, %d, mean, ", i, 0);
+        printf("%d, Blossom5, %d, mean distance, ", i, 0);
         fflush(stdout);
         if(system(command.c_str()) != 0) {
           std::cerr << "Error executing Blossom5." << std::endl;
           exit(1);
         }
+        // Get mean of Blossom5 rank
+        FILE *f = fopen("output.txt", "r");
+        unsigned from, to;
+        s.positions.clear();
+        unsigned avg_rank = 0;
+        fscanf(f, "%u %u\n", &from, &to);
+        for (size_t i = 0; i < population / 2; ++i) {
+          fscanf(f, "%u %u\n", &from, &to);
+          unsigned r = s.find_partner_rank(s.agents[from],
+                                           s.agents[to]);
+          s.positions.push_back(r);
+          avg_rank += r;
+        }
+        printf("%d, Blossom5, %d, mean rank, %.2f\n", i, 0,
+               (double) avg_rank / (population / 2));
+        {
+          auto statistics = med_iqr(s.positions.begin(), s.positions.end());
+          printf("%d, Blossom5, %d, median rank, %.2f\n", i, 0,
+                 statistics[1]);
+          printf("%d, Blossom5, %d, 25%% rank, %.2f\n", i, 0,
+                 statistics[0]);
+          printf("%d, Blossom5, %d, 75%% rank, %.2f\n", i, 0,
+                 statistics[2]);
+          auto st = stddev(s.positions.begin(), s.positions.end(),
+                           (double) avg_rank / (population / 2));
+          printf("%d, Blossom5, %d, stddev rank, %.2f\n", i, 0, st);
+        }
+        fclose(f);
       }
     }
     if (outfile)
@@ -775,7 +873,7 @@ int main(int argc, char *argv[])
 {
   unsigned population = 16, clusters = 4, neighbors = 2,
     seed = 0, iterations = 1, runs = 1, ages = 5;
-  bool verbose = false, run_blossom = false;
+  bool verbose = false, run_blossom = false, timings_only = false;
   double attractor_factor = 0.5;
   double rejector_factor = 0.5;
 
@@ -826,6 +924,8 @@ int main(int argc, char *argv[])
     verbose = true;
   if(cmdOptionExists(argv, argv+argc, "-b"))
     run_blossom = true;
+  if(cmdOptionExists(argv, argv+argc, "-t"))
+    timings_only = true;
 
 
 #ifdef ATTRACT_REJECT
@@ -836,5 +936,6 @@ int main(int argc, char *argv[])
 
   run_tests(population, clusters, ages, neighbors,
 	    attractor_factor, rejector_factor, iterations,
-	    seed, runs, std::string(algorithms), graph_str, out_str, run_blossom, verbose);
+	    seed, runs, std::string(algorithms), graph_str, out_str,
+            run_blossom, timings_only, verbose);
 }
