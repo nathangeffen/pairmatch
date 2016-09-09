@@ -16,6 +16,9 @@ all: $(TARGET)
 $(TARGET): $(TARGET).cc
 	$(CXX) $(CXXFLAGS) $(EXTRAFLAGS) -o $(TARGET) $(TARGET).cc
 
+dev_attract: clean
+	$(CXX) $(CXXFLAGS) $(EXTRAFLAGS) -D ATTRACT_REJECT -o $(TARGET) $(TARGET).cc
+
 release: clean
 	$(CXX) $(RELFLAGS) $(EXTRAFLAGS) -o $(TARGET) $(TARGET).cc
 

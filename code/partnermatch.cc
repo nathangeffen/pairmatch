@@ -1,6 +1,3 @@
-// TO DO WHY IS distance(a,b) not returning exactly same as distance(b, a)?
-
-
 /* Code to test partner matching algorithms.
    Copyright (C) Nathan Geffen.
    See LICENSE file for copyright details.
@@ -61,7 +58,7 @@ struct InitialVals {
   double age_factor = 1.0;
   double orientation_factor = 100.0;
   double tightness_factor = 1.0;
-  double distance_factor = 0.1;
+  double distance_factor =  0.1;
   double previous_partner_factor = 500.0;
   double attractor_factor = 0.5;
   double rejector_factor = 0.5;
@@ -138,7 +135,7 @@ public:
   double euclidean_distance(const Agent &a)
   {
     double x_d = (x_coord - a.x_coord);
-    double y_d = (x_coord - a.y_coord);
+    double y_d = (y_coord - a.y_coord);
     return std::sqrt(x_d * x_d + y_d * y_d);
   }
 
@@ -171,7 +168,7 @@ public:
     double tightness_diff;
     double distance_diff;
 
-    if (count (partners.begin(), partners.end(), &a) > partner_count)
+    if ( (uint64_t) count (partners.begin(), partners.end(), &a) > partner_count)
       prev_partner = initial_vals_.previous_partner_factor;
     else
       prev_partner = 0;
@@ -421,8 +418,9 @@ public:
     std::shuffle(agents.begin(), agents.end(), initial_vals.rng);
     for (auto it = agents.begin(); it < agents.end() - 1; ++it) {
       if ( (*it)->partners.size() < iteration) {
-	auto last = agents.end() - it < (neighbors + 1) ?
-					agents.end() : it + neighbors + 1;
+	auto last = (uint64_t) (agents.end() - it) < (neighbors + 1)
+                                                     ? agents.end()
+                                                     : it + neighbors + 1;
 	auto partner = closest_pair_match_n(it, last, neighbors);
 	if (partner != last) {
 	  (*it)->partners.push_back(*partner);
@@ -443,8 +441,9 @@ public:
 	      [](Agent *a, Agent *b) {return a->weight < b->weight; });
     for (auto it = agents.begin(); it < agents.end() - 1; ++it) {
       if ( (*it)->partners.size() < iteration) {
-	auto last = agents.end() - it < (neighbors + 1) ?
-					agents.end() : it + neighbors + 1;
+	auto last = (uint64_t) (agents.end() - it) < (neighbors + 1)
+                                                     ? agents.end()
+                                                     : it + neighbors + 1;
 	auto partner = closest_pair_match_n(it, last, neighbors);
 	if (partner != last) {
 	  (*it)->partners.push_back(*partner);
@@ -472,7 +471,7 @@ public:
     }
     for (auto it = agents.begin(); it < agents.end() - 1; ++it) {
       if ( (*it)->partners.size() < iteration) {
-	auto last = agents.end() - it < (neighbors + 1) ?
+	auto last = (uint64_t) (agents.end() - it) < (neighbors + 1) ?
 					agents.end() : it + neighbors + 1;
 	auto partner = closest_pair_match_n(it, last, neighbors);
 	if (partner != last) {
@@ -555,14 +554,12 @@ public:
     }
     // Deal with the unmatched agents (there should be few of these)
     if (unmatched.size() > 0) {
-      for (size_t i = 0; i < unmatched.size() - 1; ++i) {
-        if (unmatched[i]->partners.size() < iteration) {
-          for (size_t j = unmatched.size() - 1; j > i; --j) {
-            if (unmatched[j]->partners.size() < iteration) {
-              unmatched[i]->partners.push_back(unmatched[j]);
-              unmatched[j]->partners.push_back(unmatched[i]);
-              break;
-            }
+      for (auto it = unmatched.begin(); it != unmatched.end(); ++it) {
+        if ( (*it)->partners.size() < iteration) {
+          auto partner =  closest_pair_match(it, unmatched.end());
+          if (partner != unmatched.end()) {
+            (*it)->partners.push_back(*partner);
+            (*partner)->partners.push_back(*it);
           }
         }
       }
@@ -582,7 +579,7 @@ public:
     command += std::string( " / ");
     command += boost::lexical_cast<std::string>(agents.size() / 2);
     command += std::string("; print avg}'");
-    printf("Blossom V command line, mean distance, ");
+    printf("# Blossom V command line, mean distance, ");
     fflush(stdout);
     if(system(command.c_str()) != 0) {
       std::cerr << "Error executing Blossom V." << std::endl;
@@ -896,6 +893,7 @@ int main(int argc, char *argv[])
   char *out_str =  getCmdOption(argv, argv + argc, "-o");
   std::string algorithms = "RNWDCB";
 
+  std::cout << "# ";
   for (int i = 0; i < argc; ++i)
     std::cout << argv[i] << " ";
   std::cout << std::endl;
@@ -933,9 +931,9 @@ int main(int argc, char *argv[])
     timings_only = true;
 
 #ifdef ATTRACT_REJECT
-  printf("Compiled with ATTRACT_REJECT on\n");
+  printf("# Compiled with ATTRACT_REJECT on\n");
 #else
-  printf("Compiled with ATTRACT_REJECT off\n");
+  printf("# Compiled with ATTRACT_REJECT off\n");
 #endif
   run_tests(population, clusters, ages, neighbors,
 	    attractor_factor, rejector_factor, iterations,
