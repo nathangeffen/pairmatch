@@ -572,9 +572,15 @@ public:
          {
            return a->id < b->id;
          });
-    make_graph_all_partners("graph.csv");
-    std::string command("./blossom5 -e graph.csv");
-    command +=  std::string(" -w output.txt | tail -n 1 | awk '{avg = $3 / ");
+    std::string graph_file = std::tmpnam(nullptr);
+    std::string blossom_out_file = std::tmpnam(nullptr);
+
+    make_graph_all_partners(graph_file.c_str());
+    std::string command("./blossom5 -e ");
+    command += graph_file;
+    command +=  std::string(" -w ");
+    command += blossom_out_file;
+    command += std::string(" | tail -n 1 | awk '{avg = $3 / ");
     command += boost::lexical_cast<std::string>(GRAPH_ACCURACY);
     command += std::string( " / ");
     command += boost::lexical_cast<std::string>(agents.size() / 2);
@@ -585,7 +591,8 @@ public:
       std::cerr << "Error executing Blossom V." << std::endl;
       exit(1);
     }
-    FILE *f = fopen("output.txt", "r");
+
+    FILE *f = fopen(blossom_out_file.c_str(), "r");
     uint64_t from, to;
     if (fscanf(f, "%lu %lu\n", &from, &to) != 2) {
       fprintf(stderr, "Error reading graph file.\n");
