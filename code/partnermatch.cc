@@ -784,7 +784,7 @@ stats(Simulation &s, const char *description,
                   << statistics[2] << std::endl;
         auto st = stddev(s.distances.begin(), s.distances.end(),
                          effectiveness.avg_distance);
-        std::cout << run << ", " << description  << ", " << i << ", stddev rank, "
+        std::cout << run << ", " << description  << ", " << i << ", stddev distance, "
                   << st << std::endl;
       }
     }
