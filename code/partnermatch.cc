@@ -16,6 +16,7 @@
 #include <iostream>
 #include <functional>
 #include <random>
+#include <sstream>
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -851,20 +852,23 @@ void run_tests(std::size_t population = 16,
     Simulation s(initial_vals);
     s.init_population(population);
     if (algorithms.find("R") != std::string::npos)
-      stats(s, "Random match", [&](){s.random_match();},
+      stats(s, "Random", [&](){s.random_match();},
             iterations, i, true, true, timings_only);
     if (algorithms.find("N") != std::string::npos)
-      stats(s, "Random match n", [&](){s.random_match_n(neighbors);},
+      stats(s, "Random k", [&](){s.random_match_n(neighbors);},
 	    iterations, i, true, true, timings_only);
     if (algorithms.find("W") != std::string::npos)
       stats(s, "Weighted shuffle", [&](){s.weighted_shuffle_match(neighbors); },
 	    iterations, i, true, true, timings_only);
-    if (algorithms.find("C") != std::string::npos)
-      stats(s, "Cluster shuffle", [&](){
+    if (algorithms.find("C") != std::string::npos) {
+      std::ostringstream ss;
+      ss << "Cluster shuffle " << neighbors << " " << clusters;
+      stats(s, ss.str().c_str(), [&](){
 	  s.cluster_shuffle_match(clusters, neighbors);
 	}, iterations, i, true, true, timings_only);
+    }
     if (algorithms.find("D") != std::string::npos)
-      stats(s, "Distribution match", [&](){
+      stats(s, "Distribution", [&](){
 	  s.distribution_match(ages, neighbors);
 	}, iterations, i, true, true, timings_only);
     if (algorithms.find("B") != std::string::npos)
