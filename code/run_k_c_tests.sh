@@ -4,28 +4,28 @@ set -x
 
 make release
 
-./partnermatch -p 20000 -a C -r 40 -i 1 -n 50 -c 100 -s $RANDOM >output20k_k50.csv &
-./partnermatch -p 20000 -a C -r 40 -i 1 -n 100 -c 100 -s $RANDOM >output20k_k100.csv &
-./partnermatch -p 20000 -a C -r 40 -i 1 -n 150 -c 100 -s $RANDOM >output20k_k150.csv &
-./partnermatch -p 20000 -a C -r 40 -i 1 -n 200 -c 100 -s $RANDOM >output20k_k200.csv &
-./partnermatch -p 20000 -a C -r 40 -i 1 -n 250 -c 100 -s $RANDOM >output20k_k250.csv &
-./partnermatch -p 20000 -a C -r 40 -i 1 -n 300 -c 100 -s $RANDOM >output20k_k300.csv &
-./partnermatch -p 20000 -a C -r 40 -i 1 -n 350 -c 100 -s $RANDOM >output20k_k350.csv &
-./partnermatch -p 20000 -a C -r 40 -i 1 -n 400 -c 100 -s $RANDOM >output20k_k400.csv &
-./partnermatch -p 20000 -a C -r 40 -i 1 -n 450 -c 100 -s $RANDOM >output20k_k450.csv &
-./partnermatch -p 20000 -a C -r 40 -i 1 -n 500 -c 100 -s $RANDOM >output20k_k500.csv &
-./partnermatch -p 20000 -a C -r 40 -i 1 -n 550 -c 100 -s $RANDOM >output20k_k550.csv &
-./partnermatch -p 20000 -a C -r 40 -i 1 -n 600 -c 100 -s $RANDOM >output20k_k600.csv &
-./partnermatch -p 20000 -a C -r 40 -i 1 -n 650 -c 100 -s $RANDOM >output20k_k650.csv &
-./partnermatch -p 20000 -a C -r 40 -i 1 -n 700 -c 100 -s $RANDOM >output20k_k700.csv &
-./partnermatch -p 20000 -a C -r 40 -i 1 -n 750 -c 100 -s $RANDOM >output20k_k750.csv &
-./partnermatch -p 20000 -a C -r 40 -i 1 -n 800 -c 100 -s $RANDOM >output20k_k800.csv &
-./partnermatch -p 20000 -a C -r 40 -i 1 -n 850 -c 100 -s $RANDOM >output20k_k850.csv &
-./partnermatch -p 20000 -a C -r 40 -i 1 -n 900 -c 100 -s $RANDOM >output20k_k900.csv &
-./partnermatch -p 20000 -a C -r 40 -i 1 -n 950 -c 100 -s $RANDOM >output20k_k950.csv &
-./partnermatch -p 20000 -a C -r 40 -i 1 -n 1000 -c 100 -s $RANDOM >output20k_k1000.csv &
+# ./partnermatch -p 20000 -a C -r 40 -i 1 -n 50 -c 100 -s $RANDOM >output20k_k50.csv &
+# ./partnermatch -p 20000 -a C -r 40 -i 1 -n 100 -c 100 -s $RANDOM >output20k_k100.csv &
+# ./partnermatch -p 20000 -a C -r 40 -i 1 -n 150 -c 100 -s $RANDOM >output20k_k150.csv &
+# ./partnermatch -p 20000 -a C -r 40 -i 1 -n 200 -c 100 -s $RANDOM >output20k_k200.csv &
+# ./partnermatch -p 20000 -a C -r 40 -i 1 -n 250 -c 100 -s $RANDOM >output20k_k250.csv &
+# ./partnermatch -p 20000 -a C -r 40 -i 1 -n 300 -c 100 -s $RANDOM >output20k_k300.csv &
+# ./partnermatch -p 20000 -a C -r 40 -i 1 -n 350 -c 100 -s $RANDOM >output20k_k350.csv &
+# ./partnermatch -p 20000 -a C -r 40 -i 1 -n 400 -c 100 -s $RANDOM >output20k_k400.csv &
+# ./partnermatch -p 20000 -a C -r 40 -i 1 -n 450 -c 100 -s $RANDOM >output20k_k450.csv &
+# ./partnermatch -p 20000 -a C -r 40 -i 1 -n 500 -c 100 -s $RANDOM >output20k_k500.csv &
+# ./partnermatch -p 20000 -a C -r 40 -i 1 -n 550 -c 100 -s $RANDOM >output20k_k550.csv &
+# ./partnermatch -p 20000 -a C -r 40 -i 1 -n 600 -c 100 -s $RANDOM >output20k_k600.csv &
+# ./partnermatch -p 20000 -a C -r 40 -i 1 -n 650 -c 100 -s $RANDOM >output20k_k650.csv &
+# ./partnermatch -p 20000 -a C -r 40 -i 1 -n 700 -c 100 -s $RANDOM >output20k_k700.csv &
+# ./partnermatch -p 20000 -a C -r 40 -i 1 -n 750 -c 100 -s $RANDOM >output20k_k750.csv &
+# ./partnermatch -p 20000 -a C -r 40 -i 1 -n 800 -c 100 -s $RANDOM >output20k_k800.csv &
+# ./partnermatch -p 20000 -a C -r 40 -i 1 -n 850 -c 100 -s $RANDOM >output20k_k850.csv &
+# ./partnermatch -p 20000 -a C -r 40 -i 1 -n 900 -c 100 -s $RANDOM >output20k_k900.csv &
+# ./partnermatch -p 20000 -a C -r 40 -i 1 -n 950 -c 100 -s $RANDOM >output20k_k950.csv &
+# ./partnermatch -p 20000 -a C -r 40 -i 1 -n 1000 -c 100 -s $RANDOM >output20k_k1000.csv &
 
-wait
+# wait
 
 
 ./partnermatch -p 20000 -a C -r 40 -i 1 -n 200 -c 1 -s $RANDOM >output20k_C1.csv &
