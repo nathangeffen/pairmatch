@@ -18,4 +18,5 @@ graph.txt
 output.txt
 *.tar
 cleanstderr*
-
+D0*.*
+tables.tex

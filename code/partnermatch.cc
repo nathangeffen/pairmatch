@@ -189,13 +189,16 @@ public:
 
 
   /* Function used to cluster agents with similar attributes
-     close to each other.
+     close to each other. We've used all the attractor factors here except
+     location (x_coord and y_coord).
   */
   double cluster_value()
   {
     return initial_vals_.age_factor * dob +
       initial_vals_.orientation_factor * hetero +
-      initial_vals_.tightness_factor * tightness;
+      initial_vals_.tightness_factor * tightness +
+      0.5 * initial_vals_.distance_factor * x_coord +
+      0.5 * initial_vals_.distance_factor * y_coord;
   }
 #endif
 
@@ -390,13 +393,6 @@ public:
 	}
       }
     }
-    // DEBUGGING
-    // FILE *f = fopen("tmp_bf.csv", "w");
-    // for (auto & agent: agents) {
-    //   fprintf(f, "%lu,%lu,%.2f\n", agent->id, agent->partners.back()->id,
-    //           agent->distance(*agent->partners.back(),1));
-    // }
-    // fclose(f);
   }
 
   /* Reference partner matching algorithm: Random match. */
@@ -655,9 +651,9 @@ public:
       }
     }
     if (initial_vals.verbose) {
-      std::cout << "Number of partnerships: " << partnerships / 2 << std::endl;
-      std::cout << "Number same sex partnerships: " << samesex / 2 << std::endl;
-      std::cout << "Number of agents without partners: "
+      std::cout << "# Number of partnerships: " << partnerships / 2 << std::endl;
+      std::cout << "# Number same sex partnerships: " << samesex / 2 << std::endl;
+      std::cout << "# Number of agents without partners: "
 		<< agents.size() - denom << std::endl;
     }
     effectiveness.avg_distance /= denom;
@@ -756,6 +752,7 @@ stats(Simulation &s, const char *description,
       std::cout << run << ", " << description  << ", " << i << ", mean rank, "
                 << effectiveness.avg_rank << std::endl;
       if (avg_ranking) {
+
         auto statistics = med_iqr(s.positions.begin(), s.positions.end());
         std::cout << run << ", " << description  << ", " << i << ", median rank, "
                   << statistics[1] << std::endl;
@@ -771,6 +768,7 @@ stats(Simulation &s, const char *description,
         std::cout << run << ", " << description  << ", " << i
                   << ", mean distance, "
                   << effectiveness.avg_distance << std::endl;
+
       }
       if (avg_distance) {
         auto statistics = med_iqr(s.distances.begin(), s.distances.end());
@@ -827,10 +825,13 @@ void run_tests(std::size_t population = 16,
 	       uint64_t iterations = 1,
 	       uint64_t seed = 0,
 	       uint64_t runs = 1,
+               uint64_t firstrun = 0,
 	       std::string algorithms = std::string("RNWCB"),
                const char *outfile = NULL,
                bool run_blossom = false,
                bool timings_only = false,
+               bool headings = false,
+               const char *id_str = NULL,
 	       bool verbose = true)
 {
   InitialVals initial_vals;
@@ -841,41 +842,61 @@ void run_tests(std::size_t population = 16,
   initial_vals.rejector_factor = rejector_factor;
 
   if (verbose) {
-    std::cout << "Population: " << population << std::endl;
-    std::cout << "Clusters: " << clusters << std::endl;
-    std::cout << "Neighbors: " << neighbors << std::endl;
-    std::cout << "Attractor factor: " << attractor_factor << std::endl;
-    std::cout << "Rejector factor: " << rejector_factor << std::endl;
+    std::cout << "# Population: " << population << std::endl;
+    std::cout << "# Clusters: " << clusters << std::endl;
+    std::cout << "# Neighbors: " << neighbors << std::endl;
+    std::cout << "# Attractor factor: " << attractor_factor << std::endl;
+    std::cout << "# Rejector factor: " << rejector_factor << std::endl;
   }
-
-  for (uint64_t i = 0; i < runs; ++i) {
+  if (headings)
+    std::cout << "Run, Algorithm, k, c, ID, Iteration, Measure, Value" << std::endl;
+  if (id_str == NULL) id_str = "NA";
+  for (uint64_t i = firstrun; i < firstrun + runs; ++i) {
     Simulation s(initial_vals);
     s.init_population(population);
-    if (algorithms.find("R") != std::string::npos)
-      stats(s, "Random", [&](){s.random_match();},
+    if (algorithms.find("R") != std::string::npos) {
+      std::ostringstream ss;
+      ss << "RPM, NA, NA, " << id_str;
+      stats(s, ss.str().c_str(), [&](){s.random_match();},
             iterations, i, true, true, timings_only);
-    if (algorithms.find("N") != std::string::npos)
-      stats(s, "Random k", [&](){s.random_match_n(neighbors);},
+    }
+    if (algorithms.find("N") != std::string::npos) {
+      std::ostringstream ss;
+      ss << "RKPM, " << neighbors << ", " << "NA, " << id_str;
+      stats(s, ss.str().c_str(), [&](){s.random_match_n(neighbors);},
 	    iterations, i, true, true, timings_only);
-    if (algorithms.find("W") != std::string::npos)
-      stats(s, "Weighted shuffle", [&](){s.weighted_shuffle_match(neighbors); },
+    }
+    if (algorithms.find("W") != std::string::npos) {
+      std::ostringstream ss;
+      ss << "WSPM, " << neighbors << ", " << "NA, " << id_str;
+      stats(s, ss.str().c_str(),
+            [&](){s.weighted_shuffle_match(neighbors); },
 	    iterations, i, true, true, timings_only);
+    }
     if (algorithms.find("C") != std::string::npos) {
       std::ostringstream ss;
-      ss << "Cluster shuffle " << neighbors << " " << clusters;
+      ss << "CSPM, " << neighbors << ", " << clusters << ", " << id_str;
       stats(s, ss.str().c_str(), [&](){
 	  s.cluster_shuffle_match(clusters, neighbors);
 	}, iterations, i, true, true, timings_only);
     }
-    if (algorithms.find("D") != std::string::npos)
-      stats(s, "Distribution", [&](){
+    if (algorithms.find("D") != std::string::npos) {
+      std::ostringstream ss;
+      ss << "DCPM, NA, NA, " << id_str;
+      stats(s, ss.str().c_str(), [&](){
 	  s.distribution_match(ages, neighbors);
 	}, iterations, i, true, true, timings_only);
-    if (algorithms.find("B") != std::string::npos)
-      stats(s, "Brute force", [&](){s.brute_force_match();},
+    }
+    if (algorithms.find("B") != std::string::npos) {
+      std::ostringstream ss;
+      ss << "BFPM, NA, NA, " << id_str;
+      stats(s, ss.str().c_str(), [&](){s.brute_force_match();},
             iterations, i, true, true, timings_only);
+    }
     if (run_blossom) {
-      stats(s, "Blossom V", [&](){s.blossom();},
+      std::ostringstream ss;
+      ss << "Blossom V, NA, NA, " << id_str;
+      stats(s, ss.str().c_str(), [&](){s.blossom();},
             iterations, i, true, true, timings_only);
     }
     if (outfile)
@@ -886,22 +907,25 @@ void run_tests(std::size_t population = 16,
 int main(int argc, char *argv[])
 {
   uint64_t population = 16, clusters = 4, neighbors = 2,
-    seed = 0, iterations = 1, runs = 1, ages = 5;
-  bool verbose = false, run_blossom = false, timings_only = false;
+    seed = 0, iterations = 1, runs = 1, firstrun = 0, ages = 5;
+  bool verbose = false, run_blossom = false, timings_only = false,
+    headings = false;
   double attractor_factor = 0.5;
   double rejector_factor = 0.5;
 
-  char *population_str = getCmdOption(argv, argv + argc, "-p");
-  char *neighbors_str = getCmdOption(argv, argv + argc, "-n");
+  char *population_str = getCmdOption(argv, argv + argc, "-n");
+  char *neighbors_str = getCmdOption(argv, argv + argc, "-k");
   char *clusters_str = getCmdOption(argv, argv + argc, "-c");
   char *ages_str = getCmdOption(argv, argv + argc, "-y");
   char *iterations_str = getCmdOption(argv, argv + argc, "-i");
   char *seed_str = getCmdOption(argv, argv + argc, "-s");
   char *runs_str = getCmdOption(argv, argv + argc, "-r");
+  char *firstrun_str = getCmdOption(argv, argv + argc, "-f");
   char *alg_str = getCmdOption(argv, argv + argc, "-a");
   char *attractor_str = getCmdOption(argv, argv + argc, "-A");
   char *rejector_str = getCmdOption(argv, argv + argc, "-R");
   char *out_str =  getCmdOption(argv, argv + argc, "-o");
+  char *id_str = getCmdOption(argv, argv + argc, "-d");
   std::string algorithms = "RNWDCB";
 
   std::cout << "# ";
@@ -927,6 +951,8 @@ int main(int argc, char *argv[])
     seed = atoi(seed_str);
   if (runs_str)
     runs = atoi(runs_str);
+  if (firstrun_str)
+    firstrun = atoi(firstrun_str);
   if (alg_str)
     algorithms = alg_str;
   if (attractor_str)
@@ -940,6 +966,8 @@ int main(int argc, char *argv[])
     run_blossom = true;
   if(cmdOptionExists(argv, argv+argc, "-t"))
     timings_only = true;
+  if(cmdOptionExists(argv, argv+argc, "-h"))
+    headings = true;
 
 #ifdef ATTRACT_REJECT
   printf("# Compiled with ATTRACT_REJECT on\n");
@@ -948,6 +976,6 @@ int main(int argc, char *argv[])
 #endif
   run_tests(population, clusters, ages, neighbors,
 	    attractor_factor, rejector_factor, iterations,
-	    seed, runs, std::string(algorithms), out_str,
-            run_blossom, timings_only, verbose);
+	    seed, runs, firstrun, std::string(algorithms), out_str,
+            run_blossom, timings_only, headings, id_str, verbose);
 }
