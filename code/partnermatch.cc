@@ -618,7 +618,11 @@ public:
   /* Statistical and timing functions. */
 
   Effectiveness
-  calc_avg_match(bool calc_rank=true, bool calc_distance=true)
+  calc_avg_match(bool calc_rank=true, bool calc_distance=true
+#ifdef PRINT_RANKS
+                 , const char *description=NULL
+#endif
+                 )
   {
     Effectiveness effectiveness;
     uint64_t partnerships = 0;
@@ -647,6 +651,11 @@ public:
           uint64_t position = find_partner_rank(a);
           positions.push_back(position);
           effectiveness.avg_rank += position;
+
+#ifdef PRINT_RANKS // (used to generate pretty image in paper)
+          std::cout << description << ", Position, " << position << std::endl;
+#endif
+
         }
       }
     }
@@ -742,7 +751,11 @@ stats(Simulation &s, const char *description,
 
     if (timings_only == false) {
       start = std::chrono::system_clock::now();
-      effectiveness = s.calc_avg_match(avg_ranking, avg_distance);
+      effectiveness = s.calc_avg_match(avg_ranking, avg_distance
+#ifdef PRINT_RANKS
+                                       , description
+#endif
+                                       );
       duration = std::chrono::duration_cast<std::chrono::milliseconds>
         (std::chrono::system_clock::now() - start);
 
