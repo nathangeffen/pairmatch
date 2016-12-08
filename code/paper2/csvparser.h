@@ -1,3 +1,5 @@
+/* Downloaded from: https://sourceforge.net/p/cccsvparser/ */
+
 #ifndef CSVPARSER_H
 #define CSVPARSER_H
 
@@ -37,7 +39,7 @@ const char **CsvParser_getFields(CsvRow *csvRow);
 const char* CsvParser_getErrorMessage(CsvParser *csvParser);
 
 // Private
-CsvRow *_CsvParser_getRow(CsvParser *csvParser);    
+CsvRow *_CsvParser_getRow(CsvParser *csvParser);
 int _CsvParser_delimiterIsAccepted(const char *delimiter);
 void _CsvParser_setErrorMessage(CsvParser *csvParser, const char *errorMessage);
 

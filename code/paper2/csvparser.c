@@ -1,3 +1,5 @@
+/* Downloaded from: https://sourceforge.net/p/cccsvparser/ */
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -38,12 +40,12 @@ CsvParser *CsvParser_new(const char *filePath, const char *delimiter, int firstL
 
 CsvParser *CsvParser_new_from_string(const char *csvString, const char *delimiter, int firstLineIsHeader) {
 	CsvParser *csvParser = CsvParser_new(NULL, delimiter, firstLineIsHeader);
-	csvParser->fromString_ = 1;	
+	csvParser->fromString_ = 1;
 	if (csvString != NULL) {
 		int csvStringLen = strlen(csvString);
 		csvParser->csvString_ = (char*)malloc(csvStringLen + 1);
 		strcpy(csvParser->csvString_, csvString);
-	}	
+	}
 	return csvParser;
 }
 
