@@ -13,14 +13,20 @@ TARGET = simulate
 
 all: $(TARGET)
 
-$(TARGET): $(TARGET).cc CSV_Parser.o CSV_Parser.hh
-	$(CXX) $(CXXFLAGS) $(EXTRAFLAGS) -o $(TARGET) $(TARGET).cc
+$(TARGET): $(TARGET).cc CSV_Parser.o CSV_Parser.hh csvparser.o ransampl.o sample.hh
+	$(CXX) $(CXXFLAGS) $(EXTRAFLAGS) -o $(TARGET) $(TARGET).cc CSV_Parser.o csvparser.o ransampl.o
 
 CSV_Parser.o: CSV_Parser.cc CSV_Parser.hh
-	$(CXX) $(CXXFLAGS) -c CSV_Parser.cc csvparser.c
+	$(CXX) $(CXXFLAGS) -c CSV_Parser.cc
+
+csvparser.o: csvparser.c csvparser.h
+	$(CXX) $(CXXFLAGS) -c csvparser.c
+
+ransampl.o: ransampl.c sample.hh
+	$(CXX) $(CXXFLAGS) -c ransampl.c
 
 release: clean
 	$(CXX) $(RELFLAGS) $(EXTRAFLAGS) -o $(TARGET) $(TARGET).cc CSV_Parser.cc csvparser.c
 
 clean:
-	$(RM) $(TARGET)
+	$(RM) $(TARGET) *.o
