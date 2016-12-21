@@ -149,6 +149,33 @@ void setDefaultParameters(ParameterMap& parameterMap)
   addParameter(parameterMap, "MEAN_DAYS_UNTIL_RELATIONSHIP",
                "Mean number of days agents are partners", {365.0});
 
+  addParameter(parameterMap, "HET_MALE_INFECTIVITY",
+               "Daily risk of getting infected for male in heterosexual sex",
+               {0.001});
+  addParameter(parameterMap, "HET_FEMALE_INFECTIVITY",
+               "Daily risk of getting infected for female in heterosexual sex",
+               {0.005});
+  addParameter(parameterMap, "HET_MALE_INFECTIOUSNESS",
+               "Daily risk of infecting for male in heterosexual sex",
+               {0.005});
+  addParameter(parameterMap, "HET_FEMALE_INFECTIOUSNESS",
+               "Daily risk of infecting for female in heterosexual sex",
+               {0.001});
+
+  addParameter(parameterMap, "HOM_MALE_INFECTIVITY",
+               "Daily risk of getting infected for male in homosexual sex",
+               {0.005});
+  addParameter(parameterMap, "HOM_FEMALE_INFECTIVITY",
+               "Daily risk of getting infected for female in homosexual sex",
+               {0.0001});
+  addParameter(parameterMap, "HOM_MALE_INFECTIOUSNESS",
+               "Daily risk of infecting for male in homosexual sex",
+               {0.005});
+  addParameter(parameterMap, "HOM_FEMALE_INFECTIOUSNESS",
+               "Daily risk of infecting for female in homosexual sex",
+               {0.0001});
+
+
   addParameter(parameterMap, "AGENT_DATA_CSV",
                "Agent data for initialization", "data/data.csv");
   addParameter(parameterMap, "SINGLES_DATA_CSV",
@@ -203,8 +230,10 @@ public:
   unsigned id = 0;
   Agent* partner;
   std::vector<Agent*> past_partners;
-  double infectivity;
-  double infectiousness;
+  double het_infectivity;
+  double het_infectiousness;
+  double hom_infectivity;
+  double hom_infectiousness;
   bool infected;
   bool initial_relationship;
   double age;
@@ -253,6 +282,10 @@ ostream& operator<<(ostream& os, const Agent& agent)
        << ",Desired," << p->desired_age;
   }
   os << ",Date," << agent.relationship_change_date;
+  os << ",Infection," << agent.het_infectivity << " "
+     << agent.het_infectiousness << " "
+     << agent.hom_infectivity << " "
+     << agent.hom_infectiousness;
   return os;
 }
 
@@ -345,7 +378,28 @@ double calcNumberSingles(DblMatrix data, unsigned X)
   return round(num_agents);
 }
 
+void setAgentInfectionParameters(Agent& agent,
+                                 double het_male_infectivity,
+                                 double het_female_infectivity,
+                                 double het_male_infectiousness,
+                                 double het_female_infectiousness,
+                                 double hom_male_infectivity,
+                                 double hom_female_infectivity,
+                                 double hom_male_infectiousness,
+                                 double hom_female_infectiousness)
+{
+  agent.het_infectivity =
+    agent.sex == MALE ? het_male_infectivity : het_female_infectivity;
+  agent.hom_infectivity =
+    agent.sex == MALE ? hom_male_infectivity : hom_female_infectivity;
+  agent.het_infectiousness =
+    agent.sex == MALE ? het_male_infectiousness : het_female_infectiousness;
+  agent.hom_infectiousness =
+    agent.sex == MALE ? hom_male_infectiousness : hom_female_infectiousness;
+}
+
 void createPartners(AgentVector& agents,
+                    const ParameterMap& parameterMap,
                     const DblMatrix& data,
                     const unsigned fromAgent,
                     const unsigned toAgent,
@@ -358,12 +412,30 @@ void createPartners(AgentVector& agents,
                     const DblMatrix& matMW,
                     const DblMatrix& matWM,
                     const DblMatrix& matMM,
-                    double start_date,
-                    double mean_days_relationship,
-                    double mean_days_until_relationship,
                     bool initial_relation)
 {
   std::uniform_real_distribution<double> uni;
+  double start_date = parameterMap.at("START_DATE").getDbl();
+  double mean_days_relationship =
+    parameterMap.at("MEAN_DAYS_RELATIONSHIP").getDbl();
+  double mean_days_until_relationship =
+    parameterMap.at("MEAN_DAYS_UNTIL_RELATIONSHIP").getDbl();
+  double het_male_infectivity =
+    parameterMap.at("HET_MALE_INFECTIVITY").getDbl();
+  double het_male_infectiousness =
+    parameterMap.at("HET_MALE_INFECTIOUSNESS").getDbl();
+  double het_female_infectivity =
+    parameterMap.at("HET_FEMALE_INFECTIVITY").getDbl();
+  double het_female_infectiousness =
+    parameterMap.at("HET_FEMALE_INFECTIOUSNESS").getDbl();
+  double hom_male_infectivity =
+    parameterMap.at("HOM_MALE_INFECTIVITY").getDbl();
+  double hom_male_infectiousness =
+    parameterMap.at("HOM_MALE_INFECTIOUSNESS").getDbl();
+  double hom_female_infectivity =
+    parameterMap.at("HOM_FEMALE_INFECTIVITY").getDbl();
+  double hom_female_infectiousness =
+    parameterMap.at("HOM_FEMALE_INFECTIOUSNESS").getDbl();
   Sample sample_ageshare(ageShare, &rng);
   vector<Sample> sample_matWW(matWW[0].size());
   vector<Sample> sample_matMW(matMW[0].size());
@@ -410,6 +482,15 @@ void createPartners(AgentVector& agents,
 
     agent->binomial_p_relationship_length = uni(rng);
     agent->binomial_p_relationship_wait = uni(rng);
+    setAgentInfectionParameters(*agent,
+                                het_male_infectivity,
+                                het_female_infectivity,
+                                het_male_infectiousness,
+                                het_female_infectiousness,
+                                hom_male_infectivity,
+                                hom_female_infectivity,
+                                hom_male_infectiousness,
+                                hom_female_infectiousness);
 
     if (initial_relation) {
       // Relationship
@@ -438,6 +519,16 @@ void createPartners(AgentVector& agents,
       // Preferred age of partner
       partner->desired_age = agent->age;
       // partner sexual_orientation
+      setAgentInfectionParameters(*partner,
+                                  het_male_infectivity,
+                                  het_female_infectivity,
+                                  het_male_infectiousness,
+                                  het_female_infectiousness,
+                                  hom_male_infectivity,
+                                  hom_female_infectivity,
+                                  hom_male_infectiousness,
+                                  hom_female_infectiousness);
+
     } else {
       agent->partner = NULL;
     }
@@ -489,25 +580,15 @@ void initializeAgents(AgentVector& agents,
   auto wswRate = getCol(singles, 4);
   // create_singles(agents, data, S, ageRange, ageShare,
   //		 femRatio, wswRate, msmRate);
-  double start_date = parameterMap.at("START_DATE").getDbl();
-  double mean_days_relationship =
-    parameterMap.at("MEAN_DAYS_RELATIONSHIP").getDbl();
-  double mean_days_until_relationship =
-    parameterMap.at("MEAN_DAYS_UNTIL_RELATIONSHIP").getDbl();
-
-  createPartners(agents, data, 0, S, ageRange, ageShare, femRatio,
-                 wswRate, msmRate, ww, mw, wm, mm,
-                 start_date, mean_days_relationship,
-                 mean_days_until_relationship, false);
+  createPartners(agents, parameterMap, data, 0, S, ageRange, ageShare, femRatio,
+                 wswRate, msmRate, ww, mw, wm, mm, true);
   ageShare = femRatio = msmRate = wswRate = {};
   ageShare = getCol(partners, 1);
   femRatio = getCol(partners, 2);
   msmRate = getCol(partners, 3);
   wswRate = getCol(partners, 4);
-  createPartners(agents, data, S, X, ageRange, ageShare, femRatio,
-                 wswRate, msmRate, ww, mw, wm, mm,
-                 start_date, mean_days_relationship,
-                 mean_days_until_relationship, true);
+  createPartners(agents, parameterMap, data, S, X, ageRange, ageShare, femRatio,
+                 wswRate, msmRate, ww, mw, wm, mm, true);
 }
 
 void deleteAgents(AgentVector& agents)
