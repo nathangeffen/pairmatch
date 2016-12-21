@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <fstream>
 #include <initializer_list>
+#include <iomanip>
 #include <iostream>
 #include <random>
 #include <map>
@@ -15,6 +16,8 @@
 
 thread_local std::mt19937 rng;
 
+#define DAY 1.0 / 365;
+
 #define BFPM 1
 #define RPM 2
 #define CSPM 3
@@ -23,18 +26,6 @@ thread_local std::mt19937 rng;
 #define MALE 1
 #define HETEROSEXUAL 0
 #define HOMOSEXUAL 1
-#define WANTS_TO_BE_SINGLE 0
-#define WANTS_TO_BE_PARTNERED 1
-#define NUM_RELS 2
-#define NUM_AGES 101
-#define NUM_SEXES 2
-#define NUM_ORIENTATIONS 2
-
-const unsigned SEXOR_DIM = NUM_AGES;
-const unsigned SEX_DIM = NUM_ORIENTATIONS * SEXOR_DIM;
-const unsigned AGE_DIM = NUM_SEXES * SEX_DIM;
-const unsigned REL_DIM = NUM_AGES * AGE_DIM;
-const unsigned NUM_BUCKETS = NUM_RELS * REL_DIM;
 
 struct ParameterValue {
   double getDbl(size_t index = 0) const
@@ -132,7 +123,7 @@ bool replaceParameter(ParameterMap& parameterMap,
 
 void setDefaultParameters(ParameterMap& parameterMap)
 {
-  addParameter(parameterMap, "NUM_AGENTS", "Number of agents", {10000.0});
+  addParameter(parameterMap, "NUM_AGENTS", "Number of agents", {100.0});
   addParameter(parameterMap, "MALE_INFECTIVITY", "How easily males are infected",
                {0.1});
   addParameter(parameterMap, "FEMALE_INFECTIVITY",
@@ -153,6 +144,10 @@ void setDefaultParameters(ParameterMap& parameterMap)
                "1 for BFPM, 2 for RPM, 3 for CSPM", {BFPM});
   addParameter(parameterMap, "PREV_PARTNER_PENALTY",
                "Previous partner penalty in pair matching", {10.0});
+  addParameter(parameterMap, "MEAN_DAYS_RELATIONSHIP",
+               "Mean number of days agents are partners", {365.0});
+  addParameter(parameterMap, "MEAN_DAYS_UNTIL_RELATIONSHIP",
+               "Mean number of days agents are partners", {365.0});
 
   addParameter(parameterMap, "AGENT_DATA_CSV",
                "Agent data for initialization", "data/data.csv");
@@ -205,30 +200,74 @@ void readParameters(std::istream& input, ParameterMap& parameterMap)
 
 class Agent {
 public:
-  unsigned id;
+  unsigned id = 0;
   Agent* partner;
   std::vector<Agent*> past_partners;
   double infectivity;
   double infectiousness;
-  double breakupiness;
   bool infected;
-  unsigned rel;
+  bool initial_relationship;
   double age;
   unsigned sex;
-  unsigned sexor;
-  unsigned page;
-  unsigned psex;
-  unsigned psexor;
+  unsigned sexual_orientation;
+  unsigned desired_age;
+  double relationship_change_date;
+  double binomial_p_relationship_length;
+  double binomial_p_relationship_wait;
+  void setRelationshipChangeDate(double current_date,
+                                 double mean_days_relationship,
+                                 double mean_days_until_relationship)
+  {
+    double val = partner == NULL
+      ? mean_days_until_relationship : mean_days_relationship;
+    double p = partner == NULL ? binomial_p_relationship_wait :
+      (binomial_p_relationship_length + partner->binomial_p_relationship_length)
+      / 2.0;
+    std::binomial_distribution<int> dist (val, p);
+    relationship_change_date = current_date + (double) dist(rng) * DAY;
+    if (partner)
+      partner->relationship_change_date = relationship_change_date;
+  }
 };
 
+ostream& operator<<(ostream& os, const Agent& agent)
+{
+  os << "ID," << agent.id << ",Age," << agent.age
+     << ",Sex," << (agent.sex == MALE ? "M" : "F")
+     << ",Orientation," << (agent.sexual_orientation == HETEROSEXUAL
+         ? "S" : "G")
+     << ",Desired," << agent.desired_age;
+  std::ios_base::fmtflags oldflags = os.flags();
+  std::streamsize oldprecision = os.precision();
+  os << std::fixed << std::setprecision(3)
+     << ",Risk," << agent.binomial_p_relationship_length
+     << "," << agent.binomial_p_relationship_wait;
+  os.flags (oldflags);
+  os.precision (oldprecision);
+  if (agent.partner) {
+    auto &p = agent.partner;
+    os << ",ID," << p->id << ",Age," << agent.age
+       << ",Sex," << (p->sex == MALE ? "M" : "F")
+       << ",Orientation," << (p->sexual_orientation == HETEROSEXUAL
+                                       ? "S" : "G")
+       << ",Desired," << p->desired_age;
+  }
+  os << ",Date," << agent.relationship_change_date;
+  return os;
+}
+
 typedef std::vector<Agent *> AgentVector;
+
+void printAgents(const AgentVector& agents)
+{
+  for (auto& agent: agents)
+    std::cout << *agent << std::endl;
+}
 
 /* Initialization routines */
 
 
 /* Supporting functions for Stefan's initial population creation algorithm. */
-
-
 
 std::vector<double> getCol(const DblMatrix& matrix, unsigned col)
 {
@@ -306,57 +345,23 @@ double calcNumberSingles(DblMatrix data, unsigned X)
   return round(num_agents);
 }
 
-void create_singles(AgentVector& agents,
-		    const DblMatrix& data,
-		    const unsigned S,
-		    const std::vector<double>& ageRange,
-		    const std::vector<double>& ageShare,
-		    const std::vector<double>& femRatio,
-		    const std::vector<double>& wswRate,
-		    const std::vector<double>& msmRate)
-{
-  std::uniform_real_distribution<double> uni;
-  Sample sample_ageshare(ageShare, &rng);
-  for(unsigned i = 0; i < S; ++i) {
-    Agent *agent = new Agent();
-    // ID
-    agent->id = i + 1;
-    // Age
-    unsigned age = sample_ageshare();
-    agent->age = age;
-    // Sex
-    unsigned sex = uni(rng) < femRatio[age] ? FEMALE : MALE;
-    agent->sex = sex;
-    // Sexor
-    unsigned sexor;
-    if (sex == FEMALE) {
-      sexor = uni(rng) < wswRate[age] ? HOMOSEXUAL : HETEROSEXUAL;
-    } else {
-      sexor = uni(rng) < msmRate[age] ? HOMOSEXUAL : HETEROSEXUAL;
-    }
-    agent->sexor = sexor;
-    agent->rel = 0;
-    agent->partner = NULL;
-    agent->page = 0;
-    agent->psex = 0;
-    agent->psexor = 0;
-    agents.push_back(agent);
-  }
-}
-
-void create_partners_ACP(AgentVector& agents,
-			 const DblMatrix& data,
-			 const unsigned fromAgent,
-			 const unsigned toAgent,
-			 const std::vector<double>& ageRange,
-			 const std::vector<double>& ageShare,
-			 const std::vector<double>& femRatio,
-			 const std::vector<double>& wswRate,
-			 const std::vector<double>& msmRate,
-			 const DblMatrix& matWW,
-			 const DblMatrix& matMW,
-			 const DblMatrix& matWM,
-			 const DblMatrix& matMM)
+void createPartners(AgentVector& agents,
+                    const DblMatrix& data,
+                    const unsigned fromAgent,
+                    const unsigned toAgent,
+                    const std::vector<double>& ageRange,
+                    const std::vector<double>& ageShare,
+                    const std::vector<double>& femRatio,
+                    const std::vector<double>& wswRate,
+                    const std::vector<double>& msmRate,
+                    const DblMatrix& matWW,
+                    const DblMatrix& matMW,
+                    const DblMatrix& matWM,
+                    const DblMatrix& matMM,
+                    double start_date,
+                    double mean_days_relationship,
+                    double mean_days_until_relationship,
+                    bool initial_relation)
 {
   std::uniform_real_distribution<double> uni;
   Sample sample_ageshare(ageShare, &rng);
@@ -372,7 +377,8 @@ void create_partners_ACP(AgentVector& agents,
     sample_matMW[i].init(getCol(matMW,i), &rng);
     sample_matMM[i].init(getCol(matMM,i), &rng);
   }
-  for (unsigned i = fromAgent; i + 1 < toAgent; i+=2) {
+  unsigned increment = initial_relation ? 2 : 1;
+  for (unsigned i = fromAgent; (i + increment - 1) < toAgent; i += increment) {
     Agent *agent = new Agent();
     // ID
     agent->id = i + 1;
@@ -382,57 +388,64 @@ void create_partners_ACP(AgentVector& agents,
     // Sex
     unsigned sex = uni(rng) < femRatio[age - 12] ? FEMALE : MALE;
     agent->sex = sex;
-    // Sexor
-    unsigned sexor;
+    // Sexual_Orientation
+    unsigned sexual_orientation;
     if (sex == FEMALE) {
-      sexor = uni(rng) < wswRate[age - 12] ? HOMOSEXUAL : HETEROSEXUAL;
+      sexual_orientation = uni(rng) < wswRate[age - 12]
+                                      ? HOMOSEXUAL : HETEROSEXUAL;
     } else {
-      sexor = uni(rng) < msmRate[age - 12] ? HOMOSEXUAL : HETEROSEXUAL;
+      sexual_orientation = uni(rng) < msmRate[age - 12]
+                                      ? HOMOSEXUAL : HETEROSEXUAL;
     }
-    agent->sexor = sexor;
-    // Relationship
-    agent->rel = 1;
-    Agent* partner = new Agent();
-    // ID of partner
-    agent->partner = partner;
-    // Partner ID
-    partner->id = i + 2;
-    // Orientation = partner's orientation
-    partner->sexor = sexor;
-    // Partner sex
-    if (sexor == HETEROSEXUAL) {
-      if (sex == MALE)
-	partner->sex = FEMALE;
-      else
-	partner->sex = MALE;
+    agent->sexual_orientation = sexual_orientation;
+    // Desire age of partner
+    if (sex == FEMALE && sexual_orientation == HOMOSEXUAL)
+      agent->desired_age  = sample_matWW[age - 12]() + 12;
+    else if (sex == FEMALE && sexual_orientation == HETEROSEXUAL)
+      agent->desired_age = sample_matWM[age - 12]() + 12;
+    else if (sex == MALE && sexual_orientation == HETEROSEXUAL)
+      agent->desired_age = sample_matMW[age - 12]() + 12;
+    else
+      agent->desired_age = sample_matMM[age - 12]() + 12;
+
+    agent->binomial_p_relationship_length = uni(rng);
+    agent->binomial_p_relationship_wait = uni(rng);
+
+    if (initial_relation) {
+      // Relationship
+      agent->initial_relationship = true;
+      Agent* partner = new Agent();
+      // ID of partner
+      agent->partner = partner;
+      // Partner ID
+      partner->id = i + 2;
+      // Orientation = partner's orientation
+      partner->sexual_orientation = sexual_orientation;
+      // Partner sex
+      if (sexual_orientation == HETEROSEXUAL) {
+        if (sex == MALE)
+          partner->sex = FEMALE;
+        else
+          partner->sex = MALE;
+      } else {
+        partner->sex = sex;
+      }
+      partner->age = agent->desired_age;
+      // Partner in relationship
+      partner->initial_relationship = true;
+      // Partner's partner
+      partner->partner = agent;
+      // Preferred age of partner
+      partner->desired_age = agent->age;
+      // partner sexual_orientation
     } else {
-      partner->sex = sex;
+      agent->partner = NULL;
     }
-    // Partner age
-    if (sex == FEMALE && sexor == HOMOSEXUAL) {
-      partner->age  = sample_matWW[age - 12]() + 12;
-    } else if (sex == FEMALE && sexor == HETEROSEXUAL) {
-      partner->age = sample_matWM[age - 12]() + 12;
-    } else if (sex == MALE && sexor == HETEROSEXUAL) {
-      partner->age = sample_matMW[age - 12]() + 12;
-    } else {
-      partner->age = sample_matMM[age - 12]() + 12;
-    }
-    // Partner in relationship
-    partner->rel = 1;
-    // Partner's partner
-    partner->partner = agent;
-    // Preferred age of partner
-    agent->page = partner->age;
-    partner->page = agent->age;
-    // Preferred partner sex
-    agent->psex = partner->sex;
-    partner->psex = agent->sex;
-    // partner sexor
-    agent->psexor = partner->sexor;
-    partner->psexor = agent->sexor;
+    agent->setRelationshipChangeDate(start_date, mean_days_relationship,
+                                     mean_days_until_relationship);
     agents.push_back(agent);
-    agents.push_back(partner);
+    if (agent->partner)
+      agents.push_back(agent->partner);
   }
 }
 
@@ -474,15 +487,34 @@ void initializeAgents(AgentVector& agents,
   auto femRatio = getCol(singles, 2);
   auto msmRate = getCol(singles, 3);
   auto wswRate = getCol(singles, 4);
-  create_singles(agents, data, S, ageRange, ageShare,
-		 femRatio, wswRate, msmRate);
+  // create_singles(agents, data, S, ageRange, ageShare,
+  //		 femRatio, wswRate, msmRate);
+  double start_date = parameterMap.at("START_DATE").getDbl();
+  double mean_days_relationship =
+    parameterMap.at("MEAN_DAYS_RELATIONSHIP").getDbl();
+  double mean_days_until_relationship =
+    parameterMap.at("MEAN_DAYS_UNTIL_RELATIONSHIP").getDbl();
+
+  createPartners(agents, data, 0, S, ageRange, ageShare, femRatio,
+                 wswRate, msmRate, ww, mw, wm, mm,
+                 start_date, mean_days_relationship,
+                 mean_days_until_relationship, false);
   ageShare = femRatio = msmRate = wswRate = {};
   ageShare = getCol(partners, 1);
   femRatio = getCol(partners, 2);
   msmRate = getCol(partners, 3);
   wswRate = getCol(partners, 4);
-  create_partners_ACP(agents, data, S, X, ageRange, ageShare, femRatio,
-  		      wswRate, msmRate, ww, mw, wm, mm);
+  createPartners(agents, data, S, X, ageRange, ageShare, femRatio,
+                 wswRate, msmRate, ww, mw, wm, mm,
+                 start_date, mean_days_relationship,
+                 mean_days_until_relationship, true);
+}
+
+void deleteAgents(AgentVector& agents)
+{
+  for (auto& a: agents) {
+    delete a;
+  }
 }
 
 /* Simulation routines */
@@ -490,15 +522,18 @@ void initializeAgents(AgentVector& agents,
 void simulate(const ParameterMap& parameterMap)
 {
   AgentVector agents;
+
   initializeAgents(agents, parameterMap);
 
   double start_date = parameterMap.at("START_DATE").getDbl();
   double end_date = parameterMap.at("END_DATE").getDbl();
   double time_step = parameterMap.at("TIME_STEP").getDbl();
+
   for (double current_date = start_date; current_date < end_date;
        current_date += time_step) {
-
   }
+  printAgents(agents);
+  deleteAgents(agents);
 }
 
 

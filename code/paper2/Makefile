@@ -26,7 +26,7 @@ ransampl.o: ransampl.c sample.hh
 	$(CXX) $(CXXFLAGS) -c ransampl.c
 
 release: clean
-	$(CXX) $(RELFLAGS) $(EXTRAFLAGS) -o $(TARGET) $(TARGET).cc CSV_Parser.cc csvparser.c
+	$(CXX) $(RELFLAGS) $(EXTRAFLAGS) -o $(TARGET) $(TARGET).cc CSV_Parser.cc csvparser.c ransampl.c
 
 clean:
 	$(RM) $(TARGET) *.o

@@ -19,7 +19,7 @@ public:
     if (has_header) {
       header_ = CsvParser_getHeader(csvparser_);
       if (!header_) {
-	std::cerr << "Error getting csv header" << std::endl;
+	std::cerr << "Error getting csv header in " << filename << std::endl;
 	exit(1);
       }
     }
