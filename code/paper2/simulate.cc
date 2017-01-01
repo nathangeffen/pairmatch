@@ -7,6 +7,7 @@
 #include <map>
 #include <sstream>
 #include <string>
+#include <thread>
 #include <unordered_set>
 #include <vector>
 
@@ -638,8 +639,8 @@ public:
     clock_t timeBegin = clock();
     initializeAgents();
     clock_t timeNow = clock() - timeBegin;
-    printf("%s,TIMING,INIT,%ld,%f\n", simulationName.c_str(),
-           timeNow, ((float) timeNow) / CLOCKS_PER_SEC);
+    printf("%s,TIMING,INIT,%u,%f\n", simulationName.c_str(),
+           simulationNum, ((float) timeNow) / CLOCKS_PER_SEC);
     unsigned outputAgents = parameterMap.at("OUTPUT_AGENTS_AFTER_INIT").getDbl();
 
     // Age distribution matrices
@@ -682,8 +683,8 @@ public:
       }
       if (timing > 0 && (i + 1) % timing == 0) {
         timeNow = clock() - timeBegin;
-        printf("%s,TIMING,%u,%ld,%f\n",
-               simulationName.c_str(), i, timeNow,
+        printf("%s,TIMING,%u,%u,%f\n",
+               simulationName.c_str(), i, simulationNum,
                ( (float) timeNow) / CLOCKS_PER_SEC);
       }
       if (outputAgents > 0 && (i + 1) % outputFrequency == 0)
@@ -693,8 +694,9 @@ public:
     }
 
     timeNow = clock() - timeBegin;
-    printf("%s,TIMING,AFTER,%ld,%f\n",
-           simulationName.c_str(), timeNow, ( (float) timeNow) / CLOCKS_PER_SEC);
+    printf("%s,TIMING,AFTER,%u,%f\n",
+           simulationName.c_str(), simulationNum,
+           ( (float) timeNow) / CLOCKS_PER_SEC);
 
     /* Wrap up */
     outputAgents = parameterMap.at("OUTPUT_AGENTS_AT_END").getDbl();
@@ -1366,6 +1368,12 @@ bool cmdOptionExists(char** begin, char** end, const std::string& option)
 /* END COMMAND LINE PROCESSING */
 /////////////////////////////////
 
+void callSimulation(ParameterMap& parameterMap, const unsigned simulationNum)
+{
+
+  Simulation(parameterMap, simulationNum).simulate();
+}
+
 
 int main(int argc, char *argv[])
 {
@@ -1412,9 +1420,11 @@ int main(int argc, char *argv[])
       runTests(parameterMap);
     else {
       unsigned numSimulations = parameterMap.at("NUM_SIMULATIONS").getDbl();
-      for (unsigned i = 0; i < numSimulations; ++i) {
-        Simulation(parameterMap, i).simulate();
-      }
+      std::thread t[numSimulations];
+      for (unsigned i = 0; i < numSimulations; ++i)
+        t[i] = std::thread(callSimulation, std::ref(parameterMap), i);
+      for (unsigned i = 0; i < numSimulations; ++i)
+        t[i].join();
     }
   }
 }
