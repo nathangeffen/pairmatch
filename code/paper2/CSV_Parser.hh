@@ -32,7 +32,6 @@ public:
 	str_row.push_back(rowFields[i]);
       string_rows.push_back(str_row);
     }
-
   };
   DblMatrix convert_all_entries_to_doubles() {
     DblMatrix double_rows;

@@ -1,6 +1,3 @@
-#include <cstdio>
-#include <ctime>
-
 #include <algorithm>
 #include <fstream>
 #include <initializer_list>
@@ -10,7 +7,11 @@
 #include <map>
 #include <sstream>
 #include <string>
+#include <unordered_set>
 #include <vector>
+
+#include <cfloat>
+#include <ctime>
 
 #include <boost/algorithm/string.hpp>
 
@@ -20,18 +21,40 @@
 thread_local std::mt19937 rng;
 
 #define DAY 1.0 / 365;
+#define MIN_AGE 12
 #define MAX_AGE 100
 
-#define BFPM 1
-#define RPM 2
+#define RPM 1
+#define RKPM 2
 #define CSPM 3
+
+#define HEURISTIC_DISTANCE 0
+#define TABLE_DISTANCE 1
 
 #define FEMALE 0
 #define MALE 1
-#define HETEROSEXUAL 0
-#define HOMOSEXUAL 1
+#define HOMOSEXUAL 0
+#define HETEROSEXUAL 1
 
 
+#define TESTEQ(x, y, successes, failures)                               \
+  {                                                                     \
+    auto _t1 = (x);                                                     \
+    auto _t2 = (y);                                                     \
+    std::string _t3(#x);                                                \
+    std::string _t4(#y);                                                \
+    if (_t1 == _t2) {                                                   \
+      cout << "PASS:\t" << _t3 << " == " << _t4                         \
+           << "\tLine:" << __LINE__ << "\n";                            \
+      ++successes;                                                      \
+    }                                                                   \
+    else {                                                              \
+      cout << "FAIL:\t" << _t3 << " == " << _t4                         \
+           << "\t" << _t1 << " != " << _t2                               \
+           << "\tLine:" << __LINE__ << "\n";                            \
+      ++failures;                                                       \
+    }                                                                   \
+  }
 
 // Linear algebra functions for Stefan's initial population creation algorithm.
 
@@ -44,7 +67,7 @@ std::vector<double> getCol(const DblMatrix& matrix, unsigned col)
 }
 
 std::vector<double> subVector(double d,
-			       const std::vector<double>& v)
+                              const std::vector<double>& v)
 {
   std::vector<double> output;
   for (size_t i = 0; i < v.size(); ++i)
@@ -53,7 +76,7 @@ std::vector<double> subVector(double d,
 }
 
 std::vector<double> multVector(double d,
-				const std::vector<double>& v)
+                               const std::vector<double>& v)
 {
   std::vector<double> output;
   for (size_t i = 0; i < v.size(); ++i)
@@ -62,7 +85,7 @@ std::vector<double> multVector(double d,
 }
 
 std::vector<double> multVectors(const std::vector<double>& v1,
-				 const std::vector<double>& v2)
+                                const std::vector<double>& v2)
 {
   std::vector<double> output;
   for (size_t i = 0; i < v1.size(); ++i)
@@ -72,7 +95,7 @@ std::vector<double> multVectors(const std::vector<double>& v1,
 
 
 std::vector<double> addVector(const std::vector<double>& v1,
-				const std::vector<double>& v2)
+                              const std::vector<double>& v2)
 {
   std::vector<double> output;
   for (size_t i = 0; i < v1.size(); ++i)
@@ -216,6 +239,10 @@ bool replaceParameter(ParameterMap& parameterMap,
 
 void setDefaultParameters(ParameterMap& parameterMap)
 {
+  addParameter(parameterMap, "SIMULATION_NAME",
+               "Name of simulation used in output", "Default");
+  addParameter(parameterMap, "NUM_SIMULATIONS",
+               "Number of simulations to execute (default is 1)", {1});
   addParameter(parameterMap, "NUM_AGENTS", "Number of agents", {100.0});
   addParameter(parameterMap, "MALE_INFECTIVITY", "How easily males are infected",
                {0.1});
@@ -233,8 +260,6 @@ void setDefaultParameters(ParameterMap& parameterMap)
                "End date of simulation", {2018.0});
   addParameter(parameterMap, "TIME_STEP",
                "Time step for each iteration of simulation", {1.0 / 365.0});
-  addParameter(parameterMap, "MATCHING_ALGORITHM",
-               "1 for BFPM, 2 for RPM, 3 for CSPM", {BFPM});
   addParameter(parameterMap, "PREV_PARTNER_PENALTY",
                "Previous partner penalty in pair matching", {10.0});
   addParameter(parameterMap, "MEAN_DAYS_RELATIONSHIP",
@@ -268,12 +293,23 @@ void setDefaultParameters(ParameterMap& parameterMap)
                "Daily risk of infecting for female in homosexual sex",
                {0.0001});
 
+  addParameter(parameterMap, "MATCH_NEIGHBORS",
+               "Value of k (neighbors for matching", {300});
+  addParameter(parameterMap, "MATCH_CLUSTERS",
+               "Number of clusters for cluster shuffle matching", {100});
+  addParameter(parameterMap, "MATCH_SCORE_FAIL",
+               "Highest score beyond which a match between two agents must fail",
+               {2000.00});
+  addParameter(parameterMap, "MATCH_SCORE_POOR",
+               "Score for which a poor match must be registered",
+               {49.50});
+
   addParameter(parameterMap, "OUTPUT_AGENTS_AFTER_INIT",
                "Print agent info after initialization"
                "(0=no,1=yes)", {0.0});
   addParameter(parameterMap, "OUTPUT_AGENTS_DURING_SIM",
-              "Print agent info during simulation"
-              "(0=no,1=yes), (frequency of output)", {0.0, 100.0});
+               "Print agent info during simulation"
+               "(0=no,1=yes), (frequency of output)", {0.0, 100.0});
   addParameter(parameterMap, "OUTPUT_AGENTS_AT_END",
                "Print agent info at end of simulation "
                "(0=no,1=yes)", {1.0});
@@ -284,14 +320,16 @@ void setDefaultParameters(ParameterMap& parameterMap)
                "Calculate stats after initialization"
                "(0=no,1=yes)", {1.0});
   addParameter(parameterMap, "ANALYZE_DURING_SIM",
-              "Calculate stats during simulation"
-              "(0=no,1=yes), (frequency of output)", {0.0, 1.0});
+               "Calculate stats during simulation"
+               "(0=no,1=yes), (frequency of output)", {0.0, 1.0});
   addParameter(parameterMap, "ANALYZE_AT_END",
                "Calculate stats at end of simulation "
                "(0=no,1=yes)", {1.0});
   addParameter(parameterMap, "PRINT_PARAMETERS",
                "Print parameters using in simulation"
-               "(0=no,1=yes)", {1.0});
+               "(0=no,1=yes)", {0.0});
+
+  addParameter(parameterMap, "TIMING", "Output time every x iterations", {0});
 
   addParameter(parameterMap, "AGENT_DATA_CSV",
                "Agent data for initialization", "data/data.csv");
@@ -324,24 +362,37 @@ void setDefaultParameters(ParameterMap& parameterMap)
   addParameter(parameterMap, "AGE_EVENT", "Execute the aging event", {0});
   addParameter(parameterMap, "INFECT_EVENT", "Execute the infection event", {1});
   addParameter(parameterMap, "BREAKUP_EVENT", "Execute the infection event", {1});
-  addParameter(parameterMap, "RANDOM_MATCH_EVENT",
-               "Execute the infection event", {1});
+  addParameter(parameterMap, "MATCH_EVENT",
+               "Execute the infection event (1=RPM,2=RKPM,3=CSPM)", {1});
+  addParameter(parameterMap, "DISTANCE_METHOD",
+               "Distance calculation to use (0=Heuristic,1=Table)", {0});
+
+  addParameter(parameterMap, "RANDOM_SEED", "Value to set random seed to",
+               {1});
 }
 
-void readParameters(std::istream& input, ParameterMap& parameterMap)
+void readParameters(std::istream& input,
+                    std::vector<ParameterMap>& parameterMaps)
 {
   std::string lineString;
   unsigned lineNumber = 0;
   std::string errorMessage;
+  parameterMaps.push_back(ParameterMap());
+  setDefaultParameters(parameterMaps.back());
   while (std::getline(input, lineString)) {
     ++lineNumber;
     boost::trim(lineString);
     if (lineString.size() == 0) continue;
     if (lineString[0] == '#') continue;
+    if (lineString[0] == '-') {
+      parameterMaps.push_back(ParameterMap());
+      setDefaultParameters(parameterMaps.back());
+      continue;
+    }
     std::istringstream line(lineString);
     std::string parameterName;
     line >> parameterName;
-    if (replaceParameter(parameterMap, parameterName.c_str(),
+    if (replaceParameter(parameterMaps.back(), parameterName.c_str(),
                          line, errorMessage) == false) {
       fprintf(stderr,"Error at line: %u\n", lineNumber);
       fprintf(stderr, "%s\n", errorMessage.c_str());
@@ -354,14 +405,13 @@ void readParameters(std::istream& input, ParameterMap& parameterMap)
 ////////////////////////////////////
 // Agent class and related functions
 
-class Agent;
-typedef std::vector<Agent *> AgentVector;
+// Used to keep track of past partnerships
 
 class Agent {
 public:
   unsigned id = 0;
   Agent* partner;
-  AgentVector past_partners;
+  Agent* infector = NULL;
   double het_infectivity;
   double het_infectiousness;
   double hom_infectivity;
@@ -371,10 +421,13 @@ public:
   double age;
   unsigned sex;
   unsigned sexual_orientation;
-  unsigned desired_age;
+  double desired_age;
   double relationship_change_date;
   double binomial_p_relationship_length;
   double binomial_p_relationship_wait;
+  unsigned num_partners = 0;
+  unsigned num_infected = 0;
+  double weight;
 
   void setRelationshipLength(const double current_date,
                              const double mean_days_relationship)
@@ -401,31 +454,15 @@ public:
       return false;
   }
 
-  void makePartner(Agent* agent,
-                   const double current_date,
-                   const double mean_days_relationship)
+  void print(FILE *f = stdout) const
   {
-    assert(partner == NULL);
-    assert(agent->partner == NULL);
-    partner = agent;
-    agent->partner = this;
-    setRelationshipLength(current_date, mean_days_relationship);
-  }
-
-  void print(FILE *f = stdout)
-  {
-    fprintf(f, "ID,%7u,Age,%3.2f,Sex,%c,Orientation,%c,Desired,%u",
+    fprintf(f, "ID,%7u,Age,%3.2f,Sex,%c,Orientation,%c,Desired,%.0f",
             id, age, (sex == MALE ? 'M' : 'F'),
             (sexual_orientation == HETEROSEXUAL ? 'S' : 'G'), desired_age);
     fprintf(f, ",Risk,%.3f,%.3f,Partner",
             binomial_p_relationship_length,binomial_p_relationship_wait);
     if (partner)
       fprintf(f,",%7u", partner->id);
-      // auto &p = partner;
-      // fprintf(f, ",ID,%u,Age,%.2f,Sex,%c,Orientation,%c,Desired,%u",
-      //         p->id, p->age, (p->sex == MALE ? 'M' : 'F'),
-      //         (p->sexual_orientation == HETEROSEXUAL ? 'S' : 'G'),
-      //         p->desired_age);
     else
       fprintf(f, ",      0");
     fprintf(f, ",Date,%.3f,Infection,%d,%.3f,%.3f,%.3f\n",
@@ -442,7 +479,7 @@ ostream& operator<<(ostream& os, const Agent& agent)
   os << "ID," << agent.id << ",Age," << agent.age
      << ",Sex," << (agent.sex == MALE ? "M" : "F")
      << ",Orientation," << (agent.sexual_orientation == HETEROSEXUAL
-         ? "S" : "G")
+                            ? "S" : "G")
      << ",Desired," << agent.desired_age;
   std::ios_base::fmtflags oldflags = os.flags();
   std::streamsize oldprecision = os.precision();
@@ -456,7 +493,7 @@ ostream& operator<<(ostream& os, const Agent& agent)
     os << ",ID," << p->id << ",Age," << p->age
        << ",Sex," << (p->sex == MALE ? "M" : "F")
        << ",Orientation," << (p->sexual_orientation == HETEROSEXUAL
-                                       ? "S" : "G")
+                              ? "S" : "G")
        << ",Desired," << p->desired_age;
   }
   os << ",Date," << agent.relationship_change_date;
@@ -467,8 +504,7 @@ ostream& operator<<(ostream& os, const Agent& agent)
   return os;
 }
 
-// End of Agents
-////////////////////////////////////////
+typedef std::vector<Agent *> AgentVector;
 
 void printAgents(const AgentVector& agents,
                  unsigned simulation_num,
@@ -481,7 +517,49 @@ void printAgents(const AgentVector& agents,
   }
 }
 
+// End of Agents
+////////////////////////////////////////
+
+
 // Simulation class and supporting routines
+
+// Structure to keep track of partnerships
+
+class Partnerships {
+public:
+  void insert(const unsigned id1, const unsigned id2)
+  {
+    partnerships.insert(makeString(id1, id2));
+  }
+
+  bool exists(const unsigned id1, const unsigned id2) const
+  {
+    if (partnerships.find(makeString(id1, id2)) == partnerships.end())
+      return false;
+    else
+      return true;
+  }
+  size_t size() const
+  {
+    return partnerships.size();
+  }
+
+private:
+  std::string makeString(unsigned id1, unsigned id2) const
+  {
+    ostringstream ss;
+    ss << (id1 < id2 ? id1 : id2) << "_" << (id1 > id2 ? id1 : id2);
+    std::string s = ss.str();
+    return s;
+  }
+  std::unordered_set<std::string> partnerships;
+};
+
+
+struct PartnershipScore {
+  std::vector<Agent *>::iterator partner;
+  double score;
+};
 
 // Initialization routines
 
@@ -515,163 +593,13 @@ void setInitialInfection(Agent &agent,
     (uni(rng) < initialInfectionRatesFemale[(int) agent.age] ? true : false);
 }
 
-void createPartners(AgentVector& agents,
-                    const ParameterMap& parameterMap,
-                    const DblMatrix& data,
-                    const unsigned fromAgent,
-                    const unsigned toAgent,
-                    const std::vector<double>& ageRange,
-                    const std::vector<double>& ageShare,
-                    const std::vector<double>& femRatio,
-                    const std::vector<double>& wswRate,
-                    const std::vector<double>& msmRate,
-                    const DblMatrix& matWW,
-                    const DblMatrix& matMW,
-                    const DblMatrix& matWM,
-                    const DblMatrix& matMM,
-                    const std::vector<double>& initialInfectionRatesMale,
-                    const std::vector<double>& initialInfectionRatesFeMale,
-                    bool initial_relation)
-{
-  std::uniform_real_distribution<double> uni;
-  double start_date = parameterMap.at("START_DATE").getDbl();
-  double mean_days_relationship =
-    parameterMap.at("MEAN_DAYS_RELATIONSHIP").getDbl();
-  double mean_days_single =
-    parameterMap.at("MEAN_DAYS_SINGLE").getDbl();
-  double het_male_infectivity =
-    parameterMap.at("HET_MALE_INFECTIVITY").getDbl();
-  double het_male_infectiousness =
-    parameterMap.at("HET_MALE_INFECTIOUSNESS").getDbl();
-  double het_female_infectivity =
-    parameterMap.at("HET_FEMALE_INFECTIVITY").getDbl();
-  double het_female_infectiousness =
-    parameterMap.at("HET_FEMALE_INFECTIOUSNESS").getDbl();
-  double hom_male_infectivity =
-    parameterMap.at("HOM_MALE_INFECTIVITY").getDbl();
-  double hom_male_infectiousness =
-    parameterMap.at("HOM_MALE_INFECTIOUSNESS").getDbl();
-  double hom_female_infectivity =
-    parameterMap.at("HOM_FEMALE_INFECTIVITY").getDbl();
-  double hom_female_infectiousness =
-    parameterMap.at("HOM_FEMALE_INFECTIOUSNESS").getDbl();
-  Sample sample_ageshare(ageShare, &rng);
-  vector<Sample> sample_matWW(matWW[0].size());
-  vector<Sample> sample_matMW(matMW[0].size());
-  vector<Sample> sample_matWM(matWM[0].size());
-  vector<Sample> sample_matMM(matMM[0].size());
-  std::vector<double> placeholder(matMM.size(), 0.000001);
-
-  for (unsigned i = 0; i < matWW[0].size(); ++i) {
-    sample_matWW[i].init(getCol(matWW,i), &rng);
-    sample_matWM[i].init(getCol(matWM,i), &rng);
-    sample_matMW[i].init(getCol(matMW,i), &rng);
-    sample_matMM[i].init(getCol(matMM,i), &rng);
-  }
-
-
-  unsigned increment = initial_relation ? 2 : 1;
-  for (unsigned i = fromAgent; (i + increment - 1) < toAgent; i += increment) {
-    Agent *agent = new Agent();
-    // ID
-    agent->id = i + 1;
-    // Age
-    unsigned age = sample_ageshare() + 12;
-    agent->age = age;
-    // Sex
-    unsigned sex = uni(rng) < femRatio[age - 12] ? FEMALE : MALE;
-    agent->sex = sex;
-    // Sexual_Orientation
-    unsigned sexual_orientation;
-    if (sex == FEMALE) {
-      sexual_orientation = uni(rng) < wswRate[age - 12]
-                                      ? HOMOSEXUAL : HETEROSEXUAL;
-    } else {
-      sexual_orientation = uni(rng) < msmRate[age - 12]
-                                      ? HOMOSEXUAL : HETEROSEXUAL;
-    }
-    agent->sexual_orientation = sexual_orientation;
-    setInitialInfection(*agent, initialInfectionRatesMale,
-                        initialInfectionRatesFeMale);
-    // Desire age of partner
-    if (sex == FEMALE && sexual_orientation == HOMOSEXUAL)
-      agent->desired_age  = sample_matWW[age - 12]() + 12;
-    else if (sex == FEMALE && sexual_orientation == HETEROSEXUAL)
-      agent->desired_age = sample_matWM[age - 12]() + 12;
-    else if (sex == MALE && sexual_orientation == HETEROSEXUAL)
-      agent->desired_age = sample_matMW[age - 12]() + 12;
-    else
-      agent->desired_age = sample_matMM[age - 12]() + 12;
-
-    agent->binomial_p_relationship_length = uni(rng);
-    agent->binomial_p_relationship_wait = uni(rng);
-    setAgentInfectionParameters(*agent,
-                                het_male_infectivity,
-                                het_female_infectivity,
-                                het_male_infectiousness,
-                                het_female_infectiousness,
-                                hom_male_infectivity,
-                                hom_female_infectivity,
-                                hom_male_infectiousness,
-                                hom_female_infectiousness);
-    if (initial_relation) {
-      // Relationship
-      agent->initial_relationship = true;
-      Agent* partner = new Agent();
-      // ID of partner
-      agent->partner = partner;
-      // Partner ID
-      partner->id = i + 2;
-      // Orientation = partner's orientation
-      partner->sexual_orientation = sexual_orientation;
-      // Partner sex
-      if (sexual_orientation == HETEROSEXUAL) {
-        if (sex == MALE)
-          partner->sex = FEMALE;
-        else
-          partner->sex = MALE;
-      } else {
-        partner->sex = sex;
-      }
-      partner->age = agent->desired_age;
-      // Partner in relationship
-      partner->initial_relationship = true;
-      // Partner's partner
-      partner->partner = agent;
-      // Preferred age of partner
-      partner->desired_age = agent->age;
-      // partner infection risk parameters
-      setInitialInfection(*partner, initialInfectionRatesMale,
-                          initialInfectionRatesFeMale);
-      setAgentInfectionParameters(*partner,
-                                  het_male_infectivity,
-                                  het_female_infectivity,
-                                  het_male_infectiousness,
-                                  het_female_infectiousness,
-                                  hom_male_infectivity,
-                                  hom_female_infectivity,
-                                  hom_male_infectiousness,
-                                  hom_female_infectiousness);
-
-    } else {
-      agent->partner = NULL;
-    }
-    if (agent->partner)
-      agent->setRelationshipLength(start_date, mean_days_relationship);
-    else
-      agent->setSingleLength(start_date, mean_days_single);
-    agents.push_back(agent);
-    if (agent->partner)
-      agents.push_back(agent->partner);
-  }
-}
-
 class Simulation {
 public:
   Simulation(const ParameterMap& parameter_map,
              const unsigned simulation_num) :
     parameterMap(parameter_map), simulationNum(simulation_num)
   {
+    simulationName = parameterMap.at("SIMULATION_NAME").getStr();
     startDate = parameterMap.at("START_DATE").getDbl();
     endDate = parameterMap.at("END_DATE").getDbl();
     timeStep = parameterMap.at("TIME_STEP").getDbl();
@@ -679,6 +607,14 @@ public:
     meanDaysSingle = parameterMap.at("MEAN_DAYS_SINGLE").getDbl();
     currentDate = startDate;
     ageInterval = parameterMap.at("ANALYSIS_AGE_INTERVAL").getDbl();
+    neighbors = parameterMap.at("MATCH_NEIGHBORS").getDbl();
+    clusters = parameterMap.at("MATCH_CLUSTERS").getDbl();
+    failureThresholdScore = parameterMap.at("MATCH_SCORE_FAIL").getDbl();
+    poorThresholdScore = parameterMap.at("MATCH_SCORE_POOR").getDbl();
+    distanceMethod = parameterMap.at("DISTANCE_METHOD").getDbl();
+    unsigned seed = parameterMap.at("RANDOM_SEED").getDbl();
+    if (seed)
+      rng.seed(seed * simulation_num);
   }
   ~Simulation()
   {
@@ -688,20 +624,34 @@ public:
   void simulate()
   {
     // Events to execute
+
     bool execAgeEvent = (parameterMap.at("AGE_EVENT").getDbl() == 1)
       ? true : false;
     bool execInfectEvent = (parameterMap.at("INFECT_EVENT").getDbl() == 1)
       ? true : false;
     bool execBreakupEvent = (parameterMap.at("BREAKUP_EVENT").getDbl() == 1)
       ? true : false;
-    bool execRandomMatchEvent = (parameterMap.at("RANDOM_MATCH_EVENT").
-                                 getDbl() == 1) ? true : false;
+    unsigned matchEvent = parameterMap.at("MATCH_EVENT").getDbl();
+    unsigned timing = parameterMap.at("TIMING").getDbl();
+
     // Initialization
-    clock_t t = clock();
+    clock_t timeBegin = clock();
     initializeAgents();
-    t = clock() - t;
-    printf("TIMING,Initialization,%ld,%f\n",t,((float)t)/CLOCKS_PER_SEC);
+    clock_t timeNow = clock() - timeBegin;
+    printf("%s,TIMING,INIT,%ld,%f\n", simulationName.c_str(),
+           timeNow, ((float) timeNow) / CLOCKS_PER_SEC);
     unsigned outputAgents = parameterMap.at("OUTPUT_AGENTS_AFTER_INIT").getDbl();
+
+    // Age distribution matrices
+    msmAgeDist = CSVParser(parameterMap.at("MSM_AGE_DIST_CSV").stringValue.
+                           c_str(), ",", true).convert_all_entries_to_doubles();
+    wswAgeDist = CSVParser(parameterMap.at("WSW_AGE_DIST_CSV").stringValue.
+                           c_str(), ",", true).convert_all_entries_to_doubles();
+    mswAgeDist = CSVParser(parameterMap.at("MSW_AGE_DIST_CSV").stringValue.
+                           c_str(), ",", true).convert_all_entries_to_doubles();
+    wsmAgeDist = CSVParser(parameterMap.at("WSM_AGE_DIST_CSV").stringValue.
+                           c_str(), ",", true).convert_all_entries_to_doubles();
+
     if (outputAgents)
       printAgents(agents, simulationNum, startDate, stdout);
     unsigned analyzeAgents = parameterMap.
@@ -725,14 +675,26 @@ public:
       if (execAgeEvent) ageEvent();
       if (execInfectEvent) infectionEvent();
       if (execBreakupEvent) breakupEvent();
-      if (execRandomMatchEvent)
-        randomMatchEvent();
-
+      switch(matchEvent) {
+      case RPM: randomMatchEvent(); break;
+      case RKPM: randomKMatchEvent(); break;
+      case CSPM: clusterShuffleMatchEvent(); break;
+      }
+      if (timing > 0 && (i + 1) % timing == 0) {
+        timeNow = clock() - timeBegin;
+        printf("%s,TIMING,%u,%ld,%f\n",
+               simulationName.c_str(), i, timeNow,
+               ( (float) timeNow) / CLOCKS_PER_SEC);
+      }
       if (outputAgents > 0 && (i + 1) % outputFrequency == 0)
         printAgents(agents, simulationNum, currentDate, stdout);
       if (analyzeAgents > 0 && (i + 1) % analyze_frequency == 0)
         analysis();
     }
+
+    timeNow = clock() - timeBegin;
+    printf("%s,TIMING,AFTER,%ld,%f\n",
+           simulationName.c_str(), timeNow, ( (float) timeNow) / CLOCKS_PER_SEC);
 
     /* Wrap up */
     outputAgents = parameterMap.at("OUTPUT_AGENTS_AT_END").getDbl();
@@ -744,6 +706,12 @@ public:
   }
   void initializeAgents()
   {
+    unsigned numIntervals = (MAX_AGE + 1) / ageInterval + 1;
+    malesByAge = std::vector<unsigned>(numIntervals, 0);
+    femalesByAge = std::vector<unsigned>(numIntervals, 0);
+    infectedMalesByAge = std::vector<unsigned>(MAX_AGE + 1, 0);
+    infectedFemalesByAge = std::vector<unsigned>(MAX_AGE + 1, 0);
+
     CSVParser data_csv(parameterMap.at("AGENT_DATA_CSV").stringValue.c_str(),
                        ";", true);
     DblMatrix data = data_csv.convert_all_entries_to_doubles();
@@ -753,6 +721,7 @@ public:
     CSVParser partners_csv(parameterMap.
                            at("PARTNERS_DATA_CSV").stringValue.c_str(),
                            ",", true);
+
     DblMatrix partners = partners_csv.convert_all_entries_to_doubles();
     CSVParser mm_csv(parameterMap.at("MSM_DATA_CSV").stringValue.c_str(), ";",
                      false);
@@ -766,6 +735,7 @@ public:
     CSVParser wm_csv(parameterMap.at("WSM_DATA_CSV").stringValue.c_str(), ";",
                      false);
     DblMatrix wm = wm_csv.convert_all_entries_to_doubles();
+
     CSVParser infectionRatesCsv(parameterMap.at("INITIAL_INFECTION_RATES_CSV").
                                 stringValue.c_str(), ",", true);
     DblMatrix initialRatesMatrix =
@@ -773,17 +743,19 @@ public:
     std::vector<double> initialInfectionRatesMale(MAX_AGE + 1, 0.0);
     std::vector<double> initialInfectionRatesFemale(MAX_AGE + 1, 0.0);
 
-    unsigned i = 0;
-    for (auto& row : initialRatesMatrix) {
-      for (;i <= row[0] && i < MAX_AGE + 1; ++i) {
-        assert(i <= MAX_AGE);
-        initialInfectionRatesMale[i] = row[1];
-        initialInfectionRatesFemale[i] = row[2];
+    {
+      unsigned i = 0;
+      for (auto& row : initialRatesMatrix) {
+        for (;i <= row[0] && i < MAX_AGE + 1; ++i) {
+          assert(i <= MAX_AGE);
+          initialInfectionRatesMale[i] = row[1];
+          initialInfectionRatesFemale[i] = row[2];
+        }
       }
-    }
-    for (; i <= MAX_AGE; ++i) {
-      initialInfectionRatesMale[i] = 0.0;
-      initialInfectionRatesFemale[i] = 0.0;
+      for (; i <= MAX_AGE; ++i) {
+        initialInfectionRatesMale[i] = 0.0;
+        initialInfectionRatesFemale[i] = 0.0;
+      }
     }
 
     unsigned X = parameterMap.at("NUM_AGENTS").values[0];
@@ -807,10 +779,6 @@ public:
     createPartners(agents, parameterMap, data, S, X, ageRange, ageShare, femRatio,
                    wswRate, msmRate, ww, mw, wm, mm, initialInfectionRatesMale,
                    initialInfectionRatesFemale, true);
-    malesByAge.resize( (MAX_AGE + 1) / ageInterval, 0);
-    femalesByAge.resize( (MAX_AGE + 1) / ageInterval, 0);
-    infectedMalesByAge.resize( (MAX_AGE + 1) / ageInterval, 0);
-    infectedFemalesByAge.resize( (MAX_AGE + 1) / ageInterval, 0);
     for (unsigned i = 0; i < agents.size(); ++i) {
       unsigned age = agents[i]->age;
       if (agents[i]->sex == MALE) {
@@ -830,7 +798,7 @@ public:
         }
       } else {
         ++numFemales;
-        ++femalesByAge[age / ageInterval];
+        ++femalesByAge[age /  ageInterval];
         if (agents[i]->sexual_orientation == HETEROSEXUAL)
           ++numWsm;
         else
@@ -846,11 +814,163 @@ public:
       }
     }
   }
+
+  void createPartners(AgentVector& agents,
+                      const ParameterMap& parameterMap,
+                      const DblMatrix& data,
+                      const unsigned fromAgent,
+                      const unsigned toAgent,
+                      const std::vector<double>& ageRange,
+                      const std::vector<double>& ageShare,
+                      const std::vector<double>& femRatio,
+                      const std::vector<double>& wswRate,
+                      const std::vector<double>& msmRate,
+                      const DblMatrix& matWW,
+                      const DblMatrix& matMW,
+                      const DblMatrix& matWM,
+                      const DblMatrix& matMM,
+                      const std::vector<double>& initialInfectionRatesMale,
+                      const std::vector<double>& initialInfectionRatesFeMale,
+                      bool initial_relation)
+  {
+    std::uniform_real_distribution<double> uni;
+    double het_male_infectivity =
+      parameterMap.at("HET_MALE_INFECTIVITY").getDbl();
+    double het_male_infectiousness =
+      parameterMap.at("HET_MALE_INFECTIOUSNESS").getDbl();
+    double het_female_infectivity =
+      parameterMap.at("HET_FEMALE_INFECTIVITY").getDbl();
+    double het_female_infectiousness =
+      parameterMap.at("HET_FEMALE_INFECTIOUSNESS").getDbl();
+    double hom_male_infectivity =
+      parameterMap.at("HOM_MALE_INFECTIVITY").getDbl();
+    double hom_male_infectiousness =
+      parameterMap.at("HOM_MALE_INFECTIOUSNESS").getDbl();
+    double hom_female_infectivity =
+      parameterMap.at("HOM_FEMALE_INFECTIVITY").getDbl();
+    double hom_female_infectiousness =
+      parameterMap.at("HOM_FEMALE_INFECTIOUSNESS").getDbl();
+    Sample sample_ageshare(ageShare, &rng);
+    vector<Sample> sample_matWW(matWW[0].size());
+    vector<Sample> sample_matMW(matMW[0].size());
+    vector<Sample> sample_matWM(matWM[0].size());
+    vector<Sample> sample_matMM(matMM[0].size());
+    std::vector<double> placeholder(matMM.size(), 0.000001);
+
+    for (unsigned i = 0; i < matWW[0].size(); ++i) {
+      sample_matWW[i].init(getCol(matWW,i), &rng);
+      sample_matWM[i].init(getCol(matWM,i), &rng);
+      sample_matMW[i].init(getCol(matMW,i), &rng);
+      sample_matMM[i].init(getCol(matMM,i), &rng);
+    }
+
+
+    unsigned increment = initial_relation ? 2 : 1;
+    for (unsigned i = fromAgent; (i + increment - 1) < toAgent; i += increment) {
+      Agent *agent = new Agent();
+      // ID
+      agent->id = i + 1;
+      // Age
+      unsigned age = sample_ageshare() + 12;
+      agent->age = age;
+      // Sex
+      unsigned sex = uni(rng) < femRatio[age - 12] ? FEMALE : MALE;
+      agent->sex = sex;
+      // Sexual_Orientation
+      unsigned sexual_orientation;
+      if (sex == FEMALE) {
+        sexual_orientation = uni(rng) < wswRate[age - 12]
+                                        ? HOMOSEXUAL : HETEROSEXUAL;
+      } else {
+        sexual_orientation = uni(rng) < msmRate[age - 12]
+                                        ? HOMOSEXUAL : HETEROSEXUAL;
+      }
+      agent->sexual_orientation = sexual_orientation;
+      setInitialInfection(*agent, initialInfectionRatesMale,
+                          initialInfectionRatesFeMale);
+      // Desire age of partner
+      if (sex == FEMALE && sexual_orientation == HOMOSEXUAL)
+        agent->desired_age  = sample_matWW[age - 12]() + 12;
+      else if (sex == FEMALE && sexual_orientation == HETEROSEXUAL)
+        agent->desired_age = sample_matWM[age - 12]() + 12;
+      else if (sex == MALE && sexual_orientation == HETEROSEXUAL)
+        agent->desired_age = sample_matMW[age - 12]() + 12;
+      else
+        agent->desired_age = sample_matMM[age - 12]() + 12;
+
+      agent->binomial_p_relationship_length = uni(rng);
+      agent->binomial_p_relationship_wait = uni(rng);
+      setAgentInfectionParameters(*agent,
+                                  het_male_infectivity,
+                                  het_female_infectivity,
+                                  het_male_infectiousness,
+                                  het_female_infectiousness,
+                                  hom_male_infectivity,
+                                  hom_female_infectivity,
+                                  hom_male_infectiousness,
+                                  hom_female_infectiousness);
+      if (initial_relation) {
+        // Relationship
+        agent->initial_relationship = true;
+        Agent* partner = new Agent();
+        // ID of partner
+        partner->id = i + 2;
+        // Orientation = partner's orientation
+        partner->sexual_orientation = sexual_orientation;
+        // Partner sex
+        if (sexual_orientation == HETEROSEXUAL) {
+          if (sex == MALE)
+            partner->sex = FEMALE;
+          else
+            partner->sex = MALE;
+        } else {
+          partner->sex = sex;
+        }
+        partner->age = agent->desired_age;
+        // Partner in relationship
+        partner->initial_relationship = true;
+        // Preferred age of partner
+        partner->desired_age = agent->age;
+        // partner infection risk parameters
+        setInitialInfection(*partner, initialInfectionRatesMale,
+                            initialInfectionRatesFeMale);
+        setAgentInfectionParameters(*partner,
+                                    het_male_infectivity,
+                                    het_female_infectivity,
+                                    het_male_infectiousness,
+                                    het_female_infectiousness,
+                                    hom_male_infectivity,
+                                    hom_female_infectivity,
+                                    hom_male_infectiousness,
+                                    hom_female_infectiousness);
+        makePartner(agent, partner, distance(agent, partner),
+                    meanDaysRelationship);
+        // Correct relationship time because this is in the middle of relationship
+        std::uniform_real_distribution<double>
+          uni2(currentDate, agent->relationship_change_date);
+        agent->relationship_change_date = uni2(rng);
+        partner->relationship_change_date = agent->relationship_change_date;
+      } else {
+        agent->setSingleLength(currentDate, meanDaysSingle);
+        // Correct single time because this is in the middle of relationship
+        std::uniform_real_distribution<double>
+          uni2(currentDate, agent->relationship_change_date);
+        agent->relationship_change_date = uni2(rng);
+        agent->partner = NULL;
+      }
+
+      agents.push_back(agent);
+      if (agent->partner)
+        agents.push_back(agent->partner);
+    }
+  }
+
   void ageEvent()
   {
     for (auto& agent : agents)
       agent->age += timeStep;
   }
+
   void infectionEvent()
   {
     std::uniform_real_distribution<double> dist(0.0, 1.0);
@@ -866,6 +986,8 @@ public:
                             agent->partner->het_infectiousness) / 2.0;
         if (dist(rng) < risk_infection) {
           agent->infected = true;
+          agent->infector = agent->partner;
+          ++agent->partner->num_infected;
           if (agent->sex == MALE) {
             ++numInfectedMales;
             ++infectedMalesByAge[ (int) agent->age / ageInterval];
@@ -893,8 +1015,6 @@ public:
         Agent* partner = agent->partner;
         agent->partner = NULL;
         partner->partner = NULL;
-        agent->past_partners.push_back(partner);
-        partner->past_partners.push_back(agent);
         agent->setSingleLength(currentDate, meanDaysSingle);
         partner->setSingleLength(currentDate, meanDaysSingle);
       }
@@ -903,19 +1023,96 @@ public:
 
   void randomMatchEvent()
   {
+    AgentVector unmatchedAgents = getShuffledUnmatchedAgents();
+
+    if (unmatchedAgents.size() > 0)
+      for (size_t i = 0; i < unmatchedAgents.size()  - 1; i += 2)
+        makePartner(unmatchedAgents[i], unmatchedAgents[i + 1],
+                    distance(unmatchedAgents[i], unmatchedAgents[i + 1]),
+                    meanDaysRelationship);
+  }
+
+  void randomKMatchEvent()
+  {
+    std::uniform_real_distribution<double> uni;
+    AgentVector unmatchedAgents = getShuffledUnmatchedAgents();
+
+    if(unmatchedAgents.size()) {
+      for (auto it = unmatchedAgents.begin(); it < unmatchedAgents.end() - 1;
+           ++it) {
+        if ( (*it)->partner == NULL) {
+          auto last =  (unmatchedAgents.end() - it) < (neighbors + 1)
+                                                      ? unmatchedAgents.end()
+                                                      : it + neighbors + 1;
+          auto partnershipScore = closestPairMatchN(it, last);
+          if (partnershipScore.partner != last)
+            makePartner(*it, *partnershipScore.partner,
+                        partnershipScore.score, meanDaysRelationship);
+        }
+      }
+    }
+  }
+
+  void clusterShuffleMatchEvent()
+  {
+    AgentVector unmatchedAgents = getShuffledUnmatchedAgents();
+    uint64_t cluster_size = unmatchedAgents.size() / clusters;
+    for (auto& a : unmatchedAgents) a->weight = clusterValue(a);
+    sort(unmatchedAgents.rbegin(), unmatchedAgents.rend(), [](Agent *a, Agent *b)
+	 { return a->weight < b->weight; });
+    for (uint64_t i = 0; i < clusters; ++i) {
+      auto first = unmatchedAgents.begin() + i * cluster_size;
+      auto last = first + cluster_size;
+      if (last > unmatchedAgents.end()) last = unmatchedAgents.end();
+      std::shuffle(first, last, rng);
+    }
+    if(unmatchedAgents.size()) {
+      for (auto it = unmatchedAgents.begin(); it < unmatchedAgents.end() - 1;
+           ++it) {
+        if ( (*it)->partner == NULL) {
+          auto last = (unmatchedAgents.end() - it) < (neighbors + 1)
+                                                     ? unmatchedAgents.end()
+                                                     : it + neighbors + 1;
+          auto partnershipScore = closestPairMatchN(it, last);
+          if (partnershipScore.partner != last)
+            makePartner(*it, *partnershipScore.partner,
+                        partnershipScore.score, meanDaysRelationship);
+        }
+      }
+    }
+  }
+
+  AgentVector getShuffledUnmatchedAgents()
+  {
     AgentVector unmatchedAgents;
-    // Find unmatched agents due for relationship
     for (auto& agent : agents) {
       if (agent->isMatchable(currentDate))
         unmatchedAgents.push_back(agent);
     }
     shuffle(unmatchedAgents.begin(), unmatchedAgents.end(), rng);
-    if (unmatchedAgents.size() > 0)
-      for (size_t i = 0; i < unmatchedAgents.size()  - 1; i += 2)
-        unmatchedAgents[i]->makePartner(unmatchedAgents[i + 1],
-                                        currentDate,
-                                        meanDaysRelationship);
+    return unmatchedAgents;
   }
+
+  PartnershipScore
+  closestPairMatchN(std::vector<Agent *>::iterator from,
+		    std::vector<Agent *>::iterator to)
+  {
+    double smallest_val = DBL_MAX;
+    std::vector<Agent *>::iterator closest_agent = to;
+
+    for (auto it = from + 1; it != to; ++it) {
+      if ( (*it)->partner == NULL) {
+        double d = distance(*from, *it);
+        if (d < smallest_val) {
+          smallest_val = d;
+          closest_agent = it;
+        }
+      }
+    }
+    PartnershipScore partnershipScore = {closest_agent, smallest_val};
+    return partnershipScore;
+  }
+
 
   void analysis()
   {
@@ -924,15 +1121,29 @@ public:
     double malePrevalence = (double) numInfectedMales / numMales;
     double femalePrevalence = (double) numInfectedFemales / numFemales;
     double msmPrevalence = (double) numInfectedMsm / numMsm;
-    printf("ANALYSIS-TOT,%d,%f,pop,%u,infected,%u,prev,%.3f,"
-           "maleprev,%.3f,femaleprev,%.3f,"
-           "msmprev,%.3f\n",
-           simulationNum, currentDate, (numMales + numFemales),
-           (numInfectedMales + numInfectedFemales),
-           prevalence, malePrevalence,
-           femalePrevalence, msmPrevalence);
-    ostringstream ss;
-    ss.precision(3);
+    double wswPrevalence = (double) numInfectedWsw / numWsw;
+    printf("%s,ANALYSIS,INFECTED,%d,%f,%u\n",
+           simulationName.c_str(), simulationNum, currentDate,
+           numInfectedMales + numInfectedFemales);
+    printf("%s,ANALYSIS,PREVALENCE,%d,%f,%f\n",
+           simulationName.c_str(), simulationNum, currentDate, prevalence);
+    printf("%s,ANALYSIS,MALEPREVALENCE,%d,%f,%f\n",
+           simulationName.c_str(),simulationNum, currentDate, malePrevalence);
+    printf("%s,ANALYSIS,FEMALEPREVALENCE,%d,%f,%f\n",
+           simulationName.c_str(),simulationNum, currentDate, femalePrevalence);
+    printf("%s,ANALYSIS,MSMPREVALENCE,%d,%f,%f\n",
+           simulationName.c_str(),simulationNum, currentDate, msmPrevalence);
+    printf("%s,ANALYSIS,WSWPREVALENCE,%d,%f,%f\n",
+           simulationName.c_str(),simulationNum, currentDate, wswPrevalence);
+    printf("%s,ANALYSIS,PARTNERSHIPS,%d,%f,%u\n",
+           simulationName.c_str(),simulationNum, currentDate, totalPartnerships);
+    printf("%s,ANALYSIS,MSMPARTNERSHIPS,%d,%f,%u\n",
+           simulationName.c_str(),simulationNum, currentDate,
+           totalMsmPartnerships);
+    printf("%s,ANALYSIS,WSWPARTNERSHIPS,%d,%f,%u\n",
+           simulationName.c_str(), simulationNum, currentDate,
+           totalWswPartnerships);
+
     for (unsigned i = 0; i < malesByAge.size(); ++i) {
       double malePrev, femalePrev;
       if (malesByAge[i] == 0)
@@ -943,25 +1154,139 @@ public:
         femalePrev = -1.0;
       else
         femalePrev = (double) infectedFemalesByAge[i] / femalesByAge[i];
-
-      ss << "," << i * ageInterval + ageInterval << ","
-         << malePrev << ","
-         << femalePrev;
+      printf("%s,ANALYSIS,MALE_AGE_%u-%u,%d,%f,%.3f\n",
+             simulationName.c_str(),
+             i * ageInterval, i * ageInterval + ageInterval - 1,
+             simulationNum, currentDate, malePrev);
+      printf("%s,ANALYSIS,FEMALE_AGE_%u-%u,%d,%f,%.3f\n",
+             simulationName.c_str(),
+             i * ageInterval, i * ageInterval + ageInterval - 1,
+             simulationNum, currentDate, femalePrev);
     }
-    printf("ANALYSIS-AGE,%d,%f%s\n",
-           simulationNum, currentDate, ss.str().c_str());
+    printf("%s,ANALYSIS,SCORE,%d,%f,%f\n",
+           simulationName.c_str(), simulationNum, currentDate,
+           totalPartnershipScore / totalPartnerships);
+    printf("%s,ANALYSIS,FAILED,%d,%f,%u\n",
+           simulationName.c_str(), simulationNum, currentDate, failedMatches);
+    printf("%s,ANALYSIS,POOR,%d,%f,%u\n",
+           simulationName.c_str(), simulationNum, currentDate, poorMatches);
   }
-private:
+
+
+  void makePartner(Agent* a, Agent *b,
+                   const double score,
+                   const double mean_days_relationship)
+  {
+    assert(a->partner == NULL);
+    assert(b->partner == NULL);
+
+    if (score < failureThresholdScore) {
+      if (score > poorThresholdScore) ++poorMatches;
+      totalPartnershipScore += score;
+      partnerships.insert(a->id, b->id);
+      a->partner = b;
+      b->partner = a;
+      a->setRelationshipLength(currentDate, mean_days_relationship);
+      ++a->num_partners;
+      ++b->num_partners;
+      ++totalPartnerships;
+      if (a->sex == b->sex) {
+        if (a->sex == MALE)
+          ++totalMsmPartnerships;
+        else
+          ++totalWswPartnerships;
+      } else {
+        ++totalMswPartnerships;
+      }
+    } else {
+      ++failedMatches;
+    }
+  }
+
+
+  double distance(const Agent *a, const Agent *b) const
+  {
+    return distanceMethod == HEURISTIC_DISTANCE
+      ? heuristicDistance(a, b) : distributionDistance(a, b);
+  }
+
+  double heuristicDistance(const Agent *a, const Agent *b) const
+  {
+    double score = 0.0;
+
+    score +=  (fabs(a->desired_age - b->age) +
+               fabs(b->desired_age - a->age)) / 2.0;
+    if (a->sexual_orientation == HETEROSEXUAL) {
+      if (a->sex == b->sex)
+        score += 50.0;
+    } else if (a->sex != b->sex) {
+      score += 50.0;
+    }
+    if (partnerships.exists(a->id, b->id))
+        score += 50.0;
+    return score;
+  }
+
+  double distributionDistance(const Agent *a, const Agent *b) const
+  {
+    double score = 0.0;
+    unsigned a_age = a->age - MIN_AGE;
+    unsigned b_age = b->age - MIN_AGE;
+
+    if (a->sex == MALE and b->sex == FEMALE)
+      score += (mswAgeDist[a_age][b_age] + wsmAgeDist[b_age][a_age]) * 25;
+    else if (a->sex == FEMALE and b->sex == MALE)
+      score += (wsmAgeDist[a_age][b_age] + mswAgeDist[b_age][a_age]) * 25;
+    else if (a->sex == MALE and b->sex == MALE)
+      score += (msmAgeDist[a_age][b_age] + msmAgeDist[b_age][a_age]) * 25;
+    else if (a->sex == FEMALE and b->sex == FEMALE)
+      score += (wswAgeDist[a_age][b_age] + wswAgeDist[b_age][a_age]) * 25;
+    else {
+      fprintf(stderr, "Error: Unknown sex combination.\n");
+      exit(1);
+    }
+
+    if (a->sexual_orientation == HETEROSEXUAL) {
+      if (a->sex == b->sex)
+        score += 50.0;
+    } else if (a->sex != b->sex) {
+      score += 50.0;
+    }
+
+    if (partnerships.exists(a->id, b->id))
+        score += 50.0;
+
+    return score;
+  }
+
+  double clusterValue(const Agent *a) const
+  {
+    return ( (double) a->desired_age / 100.0 + a->age / 100.0) / 2.0
+      + a->sexual_orientation;
+  }
+
+  std::string simulationName;
   AgentVector agents;
+  Partnerships partnerships;
   ParameterMap parameterMap;
   unsigned simulationNum;
   unsigned ageInterval;
+  unsigned distanceMethod;
   double startDate;
   double endDate;
   double timeStep;
   double meanDaysRelationship;
   double meanDaysSingle;
   double currentDate;
+  double failureThresholdScore;
+  double poorThresholdScore;
+  double totalPartnershipScore = 0.0;
+  unsigned clusters;
+  unsigned neighbors;
+  unsigned totalPartnerships = 0;
+  unsigned totalMswPartnerships = 0;
+  unsigned totalMsmPartnerships = 0;
+  unsigned totalWswPartnerships = 0;
   unsigned numMales = 0;
   unsigned numFemales = 0;
   unsigned numMsm = 0;
@@ -974,14 +1299,46 @@ private:
   unsigned numInfectedMsw = 0;
   unsigned numInfectedWsm = 0;
   unsigned numInfectedWsw = 0;
-  vector<unsigned> malesByAge;
-  vector<unsigned> femalesByAge;
-  vector<unsigned> infectedMalesByAge;
-  vector<unsigned> infectedFemalesByAge;
+  unsigned poorMatches = 0;
+  unsigned failedMatches = 0;
+  std::vector<unsigned> malesByAge;
+  std::vector<unsigned> femalesByAge;
+  std::vector<unsigned> infectedMalesByAge;
+  std::vector<unsigned> infectedFemalesByAge;
+  DblMatrix mswAgeDist;
+  DblMatrix wsmAgeDist;
+  DblMatrix msmAgeDist;
+  DblMatrix wswAgeDist;
 };
 
 /***************************/
 
+void runTests(ParameterMap& parameterMap)
+{
+  unsigned successes = 0, failures = 0;
+
+  // Partnerships
+  Partnerships partnerships;
+  partnerships.insert(12995, 271);
+  partnerships.insert(3, 23994);
+  TESTEQ(partnerships.exists(12995, 271), true, successes, failures);
+  TESTEQ(partnerships.exists(271, 12995), true, successes, failures);
+  TESTEQ(partnerships.exists(3, 23994), true, successes, failures);
+  TESTEQ(partnerships.exists(23994, 3), true, successes, failures);
+  TESTEQ(partnerships.exists(30, 23994), false, successes, failures);
+  TESTEQ(partnerships.exists(23994, 30), false, successes, failures);
+  TESTEQ(partnerships.exists(12995, 272), false, successes, failures);
+  TESTEQ(partnerships.size() == 2, true, successes, failures);
+
+  Simulation simulation(parameterMap, 0);
+  simulation.initializeAgents();
+  TESTEQ(simulation.agents.size(), parameterMap.at("NUM_AGENTS").getDbl(),
+         successes, failures);
+
+  printf("Successes: %u. Failures: %u.\n", successes, failures);
+}
+
+/***************************/
 
 //////////////////////////////
 /* COMMAND LINE PROCESSING */
@@ -1010,23 +1367,24 @@ bool cmdOptionExists(char** begin, char** end, const std::string& option)
 /////////////////////////////////
 
 
-
 int main(int argc, char *argv[])
 {
-  ParameterMap parameterMap;
 
-  setDefaultParameters(parameterMap);
   if (cmdOptionExists(argv, argv + argc, "-h")) {
     printf("%s options, where options are:\n"
            "-h: help - Print this message.\n"
-           "-f filename: Use filename as input.\n\n"
-           "Parameters\n"
-           "**********\n",
+           "-f filename: Use filename as input.\n"
+           "-s integer: Random seed (0 - use time).\n"
+           "-t: run tests.\n",
            argv[0]);
+    ParameterMap parameterMap;
+    setDefaultParameters(parameterMap);
     printParameters(parameterMap);
     exit(1);
   }
 
+  const char *seed_str = getCmdOption(argv, argv + argc, "-s");
+  std::vector<ParameterMap> parameterMaps;
   const char *input_file_str = getCmdOption(argv, argv + argc, "-f");
   if (input_file_str) {
     std::ifstream infile;
@@ -1035,12 +1393,28 @@ int main(int argc, char *argv[])
       fprintf(stderr, "Error opening %s\n", input_file_str);
       exit(1);
     }
-    readParameters(infile, parameterMap);
+    readParameters(infile, parameterMaps);
     infile.close();
-  } else {
-    readParameters(std::cin, parameterMap);
   }
-  if (parameterMap.at("PRINT_PARAMETERS").getDbl() == 1)
-    printParameters(parameterMap);
-  Simulation(parameterMap, 0).simulate();
+
+  for (auto& parameterMap: parameterMaps) {
+    if (seed_str) {
+      unsigned seed = atoi(seed_str);
+      if (seed == 0) // Use time
+        parameterMap["RANDOM_SEED"].values = { (double) time(NULL) };
+      else
+        parameterMap["RANDOM_SEED"].values = { (double) seed};
+    }
+    if (parameterMap.at("PRINT_PARAMETERS").getDbl() == 1)
+      printParameters(parameterMap);
+
+    if (cmdOptionExists(argv, argv + argc, "-t"))
+      runTests(parameterMap);
+    else {
+      unsigned numSimulations = parameterMap.at("NUM_SIMULATIONS").getDbl();
+      for (unsigned i = 0; i < numSimulations; ++i) {
+        Simulation(parameterMap, i).simulate();
+      }
+    }
+  }
 }
