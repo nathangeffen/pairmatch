@@ -51,7 +51,7 @@ thread_local std::mt19937 rng;
     }                                                                   \
     else {                                                              \
       cout << "FAIL:\t" << _t3 << " == " << _t4                         \
-           << "\t" << _t1 << " != " << _t2                               \
+           << "\t" << _t1 << " != " << _t2                              \
            << "\tLine:" << __LINE__ << "\n";                            \
       ++failures;                                                       \
     }                                                                   \
@@ -1124,53 +1124,55 @@ public:
     double femalePrevalence = (double) numInfectedFemales / numFemales;
     double msmPrevalence = (double) numInfectedMsm / numMsm;
     double wswPrevalence = (double) numInfectedWsw / numWsw;
-    printf("%s,ANALYSIS,INFECTED,%d,%f,%u\n",
+    printf("%s,ANALYSIS,INFECTED,%d,%.3f,%u\n",
            simulationName.c_str(), simulationNum, currentDate,
            numInfectedMales + numInfectedFemales);
-    printf("%s,ANALYSIS,PREVALENCE,%d,%f,%f\n",
+    printf("%s,ANALYSIS,PREVALENCE,%d,%.3f,%f\n",
            simulationName.c_str(), simulationNum, currentDate, prevalence);
-    printf("%s,ANALYSIS,MALEPREVALENCE,%d,%f,%f\n",
+    printf("%s,ANALYSIS,MALEPREVALENCE,%d,%.3f,%f\n",
            simulationName.c_str(),simulationNum, currentDate, malePrevalence);
-    printf("%s,ANALYSIS,FEMALEPREVALENCE,%d,%f,%f\n",
+    printf("%s,ANALYSIS,FEMALEPREVALENCE,%d,%.3f,%f\n",
            simulationName.c_str(),simulationNum, currentDate, femalePrevalence);
-    printf("%s,ANALYSIS,MSMPREVALENCE,%d,%f,%f\n",
+    printf("%s,ANALYSIS,MSMPREVALENCE,%d,%.3f,%f\n",
            simulationName.c_str(),simulationNum, currentDate, msmPrevalence);
-    printf("%s,ANALYSIS,WSWPREVALENCE,%d,%f,%f\n",
+    printf("%s,ANALYSIS,WSWPREVALENCE,%d,%.3f,%f\n",
            simulationName.c_str(),simulationNum, currentDate, wswPrevalence);
-    printf("%s,ANALYSIS,PARTNERSHIPS,%d,%f,%u\n",
+    printf("%s,ANALYSIS,PARTNERSHIPS,%d,%.3f,%u\n",
            simulationName.c_str(),simulationNum, currentDate, totalPartnerships);
-    printf("%s,ANALYSIS,MSMPARTNERSHIPS,%d,%f,%u\n",
+    printf("%s,ANALYSIS,MSMPARTNERSHIPS,%d,%.3f,%u\n",
            simulationName.c_str(),simulationNum, currentDate,
            totalMsmPartnerships);
-    printf("%s,ANALYSIS,WSWPARTNERSHIPS,%d,%f,%u\n",
+    printf("%s,ANALYSIS,WSWPARTNERSHIPS,%d,%.3f,%u\n",
            simulationName.c_str(), simulationNum, currentDate,
            totalWswPartnerships);
 
     for (unsigned i = 0; i < malesByAge.size(); ++i) {
-      double malePrev, femalePrev;
+      ostringstream ssmale, ssfemale;
       if (malesByAge[i] == 0)
-        malePrev = -1.0;
+        ssmale << "NA";
       else
-        malePrev = (double) infectedMalesByAge[i] / malesByAge[i];
+        ssmale << std::setprecision(3)
+               << ( (double) infectedMalesByAge[i] / malesByAge[i] );
       if (femalesByAge[i] == 0)
-        femalePrev = -1.0;
+        ssfemale << "NA";
       else
-        femalePrev = (double) infectedFemalesByAge[i] / femalesByAge[i];
-      printf("%s,ANALYSIS,MALE_AGE_%u-%u,%d,%f,%.3f\n",
+        ssfemale << std::setprecision(3)
+                 << ((double) infectedFemalesByAge[i] / femalesByAge[i]);
+      printf("%s,ANALYSIS,MALE_AGE_%03u-%03u,%d,%.3f,%s\n",
              simulationName.c_str(),
              i * ageInterval, i * ageInterval + ageInterval - 1,
-             simulationNum, currentDate, malePrev);
-      printf("%s,ANALYSIS,FEMALE_AGE_%u-%u,%d,%f,%.3f\n",
+             simulationNum, currentDate, ssmale.str().c_str());
+      printf("%s,ANALYSIS,FEMALE_AGE_%03u-%03u,%d,%.3f,%s\n",
              simulationName.c_str(),
              i * ageInterval, i * ageInterval + ageInterval - 1,
-             simulationNum, currentDate, femalePrev);
+             simulationNum, currentDate, ssfemale.str().c_str());
     }
-    printf("%s,ANALYSIS,SCORE,%d,%f,%f\n",
+    printf("%s,ANALYSIS,SCORE,%d,%.3f,%f\n",
            simulationName.c_str(), simulationNum, currentDate,
            totalPartnershipScore / totalPartnerships);
-    printf("%s,ANALYSIS,FAILED,%d,%f,%u\n",
+    printf("%s,ANALYSIS,FAILED,%d,%.3f,%u\n",
            simulationName.c_str(), simulationNum, currentDate, failedMatches);
-    printf("%s,ANALYSIS,POOR,%d,%f,%u\n",
+    printf("%s,ANALYSIS,POOR,%d,%.3f,%u\n",
            simulationName.c_str(), simulationNum, currentDate, poorMatches);
   }
 
@@ -1218,7 +1220,9 @@ public:
 
     score +=  (fabs(a->desired_age - b->age) +
                fabs(b->desired_age - a->age)) / 2.0;
-    if (a->sexual_orientation == HETEROSEXUAL) {
+    if (a->sexual_orientation != b->sexual_orientation) {
+      score += 50.0;
+    } else if (a->sexual_orientation == HETEROSEXUAL) {
       if (a->sex == b->sex)
         score += 50.0;
     } else if (a->sex != b->sex) {
@@ -1248,7 +1252,9 @@ public:
       exit(1);
     }
 
-    if (a->sexual_orientation == HETEROSEXUAL) {
+    if (a->sexual_orientation != b->sexual_orientation) {
+      score += 50.0;
+    } else if (a->sexual_orientation == HETEROSEXUAL) {
       if (a->sex == b->sex)
         score += 50.0;
     } else if (a->sex != b->sex) {
@@ -1337,6 +1343,64 @@ void runTests(ParameterMap& parameterMap)
   TESTEQ(simulation.agents.size(), parameterMap.at("NUM_AGENTS").getDbl(),
          successes, failures);
 
+  simulation.agents[0]->age = 20;
+  simulation.agents[0]->sex = MALE;
+  simulation.agents[0]->desired_age = 50;
+  simulation.agents[0]->sexual_orientation = HETEROSEXUAL;
+
+  simulation.agents[1]->age = 30;
+  simulation.agents[1]->sex = MALE;
+  simulation.agents[1]->desired_age = 25;
+  simulation.agents[1]->sexual_orientation = HOMOSEXUAL;
+
+  simulation.agents[2]->age = 40;
+  simulation.agents[2]->sex = FEMALE;
+  simulation.agents[2]->desired_age = 30;
+  simulation.agents[2]->sexual_orientation = HETEROSEXUAL;
+
+  simulation.agents[3]->age = 25;
+  simulation.agents[3]->sex = FEMALE;
+  simulation.agents[3]->desired_age = 25;
+  simulation.agents[3]->sexual_orientation = HOMOSEXUAL;
+
+  simulation.agents[4]->age = 30;
+  simulation.agents[4]->sex = FEMALE;
+  simulation.agents[4]->desired_age = 20;
+  simulation.agents[4]->sexual_orientation = HOMOSEXUAL;
+
+  simulation.agents[5]->age = 30;
+  simulation.agents[5]->sex = MALE;
+  simulation.agents[5]->desired_age = 20;
+  simulation.agents[5]->sexual_orientation = HOMOSEXUAL;
+
+  double d = simulation.heuristicDistance(simulation.agents[0],
+                                          simulation.agents[2]);
+  TESTEQ(d, 10.0, successes, failures);
+  d = simulation.heuristicDistance(simulation.agents[0],
+                                   simulation.agents[3]);
+  TESTEQ(d, 65.0, successes, failures);
+  d = simulation.heuristicDistance(simulation.agents[0],
+                                   simulation.agents[1]);
+  TESTEQ(d, 62.5, successes, failures);
+  d = simulation.heuristicDistance(simulation.agents[1],
+                                   simulation.agents[2]);
+  TESTEQ(d, 57.5, successes, failures);
+  d = simulation.heuristicDistance(simulation.agents[1],
+                                   simulation.agents[3]);
+  TESTEQ(d, 52.5, successes, failures);
+  d = simulation.heuristicDistance(simulation.agents[2],
+                                   simulation.agents[3]);
+  TESTEQ(d, 60, successes, failures);
+
+  d = simulation.heuristicDistance(simulation.agents[3],
+                                   simulation.agents[4]);
+  TESTEQ(d, 5, successes, failures);
+
+  d = simulation.heuristicDistance(simulation.agents[1],
+                                   simulation.agents[5]);
+  TESTEQ(d, 7.5, successes, failures);
+
+
   printf("Successes: %u. Failures: %u.\n", successes, failures);
 }
 
@@ -1377,7 +1441,6 @@ void callSimulation(ParameterMap& parameterMap, const unsigned simulationNum)
 
 int main(int argc, char *argv[])
 {
-
   if (cmdOptionExists(argv, argv + argc, "-h")) {
     printf("%s options, where options are:\n"
            "-h: help - Print this message.\n"
@@ -1405,6 +1468,11 @@ int main(int argc, char *argv[])
     infile.close();
   }
 
+  if (cmdOptionExists(argv, argv + argc, "-t")) {
+    ParameterMap parameterMap;
+    setDefaultParameters(parameterMap);
+    runTests(parameterMap);
+  }
   for (auto& parameterMap: parameterMaps) {
     if (seed_str) {
       unsigned seed = atoi(seed_str);
@@ -1415,9 +1483,6 @@ int main(int argc, char *argv[])
     }
     if (parameterMap.at("PRINT_PARAMETERS").getDbl() == 1)
       printParameters(parameterMap);
-
-    if (cmdOptionExists(argv, argv + argc, "-t"))
-      runTests(parameterMap);
     else {
       unsigned numSimulations = parameterMap.at("NUM_SIMULATIONS").getDbl();
       std::thread t[numSimulations];
