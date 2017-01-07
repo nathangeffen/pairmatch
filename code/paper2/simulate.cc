@@ -12,6 +12,7 @@
 #include <vector>
 
 #include <cfloat>
+#include <cstdint>
 #include <ctime>
 
 #include <boost/algorithm/string.hpp>
@@ -39,7 +40,7 @@ thread_local std::mt19937 rng;
 
 
 #define TESTEQ(x, y, successes, failures)                               \
-  {                                                                     \
+  do {                                                                  \
     auto _t1 = (x);                                                     \
     auto _t2 = (y);                                                     \
     std::string _t3(#x);                                                \
@@ -55,7 +56,7 @@ thread_local std::mt19937 rng;
            << "\tLine:" << __LINE__ << "\n";                            \
       ++failures;                                                       \
     }                                                                   \
-  }
+  } while(0)
 
 // Linear algebra functions for Stefan's initial population creation algorithm.
 
@@ -364,9 +365,9 @@ void setDefaultParameters(ParameterMap& parameterMap)
   addParameter(parameterMap, "INFECT_EVENT", "Execute the infection event", {1});
   addParameter(parameterMap, "BREAKUP_EVENT", "Execute the infection event", {1});
   addParameter(parameterMap, "MATCH_EVENT",
-               "Execute the infection event (1=RPM,2=RKPM,3=CSPM)", {1});
+               "Execute the infection event (RPM,RKPM,CSPM)", "RPM");
   addParameter(parameterMap, "DISTANCE_METHOD",
-               "Distance calculation to use (0=Heuristic,1=Table)", {0});
+               "Distance calculation to use (HEURISTIC,TABLE)", "HEURISTIC");
 
   addParameter(parameterMap, "RANDOM_SEED", "Value to set random seed to",
                {1});
@@ -410,7 +411,7 @@ void readParameters(std::istream& input,
 
 class Agent {
 public:
-  unsigned id = 0;
+  uint32_t id = 0;
   Agent* partner;
   Agent* infector = NULL;
   double het_infectivity;
@@ -436,7 +437,8 @@ public:
     double p = (binomial_p_relationship_length +
                 partner->binomial_p_relationship_length) / 2.0;
     std::binomial_distribution<int> dist (mean_days_relationship, p);
-    relationship_change_date = current_date + (double) dist(rng) * DAY;
+    double num_days = (double) dist(rng) * DAY;
+    relationship_change_date = current_date + num_days;
     partner->relationship_change_date = relationship_change_date;
   }
   void setSingleLength(double current_date,
@@ -528,14 +530,14 @@ void printAgents(const AgentVector& agents,
 
 class Partnerships {
 public:
-  void insert(const unsigned id1, const unsigned id2)
+  void insert(const uint32_t id1, const uint32_t id2)
   {
-    partnerships.insert(makeString(id1, id2));
+    partnerships.insert(combine(id1, id2));
   }
 
-  bool exists(const unsigned id1, const unsigned id2) const
+  bool exists(const uint32_t id1, const uint32_t id2) const
   {
-    if (partnerships.find(makeString(id1, id2)) == partnerships.end())
+    if (partnerships.find(combine(id1, id2)) == partnerships.end())
       return false;
     else
       return true;
@@ -546,14 +548,14 @@ public:
   }
 
 private:
-  std::string makeString(unsigned id1, unsigned id2) const
+  uint64_t combine(uint32_t id1, uint32_t id2) const
   {
-    ostringstream ss;
-    ss << (id1 < id2 ? id1 : id2) << "_" << (id1 > id2 ? id1 : id2);
-    std::string s = ss.str();
-    return s;
+    uint64_t A = id1 < id2 ? id1 : id2;
+    uint64_t B = id1 > id2 ? id1 : id2;
+    uint64_t C = A << 32 | B;
+    return C;
   }
-  std::unordered_set<std::string> partnerships;
+  std::unordered_set<uint64_t> partnerships;
 };
 
 
@@ -612,7 +614,16 @@ public:
     clusters = parameterMap.at("MATCH_CLUSTERS").getDbl();
     failureThresholdScore = parameterMap.at("MATCH_SCORE_FAIL").getDbl();
     poorThresholdScore = parameterMap.at("MATCH_SCORE_POOR").getDbl();
-    distanceMethod = parameterMap.at("DISTANCE_METHOD").getDbl();
+    string s = parameterMap.at("DISTANCE_METHOD").getStr();
+    if (s == "HEURISTIC")
+      distanceMethod = HEURISTIC_DISTANCE;
+    else if (s == "TABLE")
+      distanceMethod = TABLE_DISTANCE;
+    else {
+      fprintf(stderr, "Unknown distance method.\n");
+      exit(1);
+    }
+
     unsigned seed = parameterMap.at("RANDOM_SEED").getDbl();
     if (seed)
       rng.seed(seed * simulation_num);
@@ -632,27 +643,30 @@ public:
       ? true : false;
     bool execBreakupEvent = (parameterMap.at("BREAKUP_EVENT").getDbl() == 1)
       ? true : false;
-    unsigned matchEvent = parameterMap.at("MATCH_EVENT").getDbl();
+    unsigned matchEvent;
     unsigned timing = parameterMap.at("TIMING").getDbl();
 
+    string s = parameterMap.at("MATCH_EVENT").getStr();
+    if (s == "RPM")
+      matchEvent = RPM;
+    else if (s == "RKPM")
+      matchEvent = RKPM;
+    else if (s == "CSPM")
+      matchEvent = CSPM;
+    else {
+      fprintf(stderr, "Unknown matching algorithm.\n");
+      exit(1);
+    }
+
+
     // Initialization
+    initializeSimulation();
     clock_t timeBegin = clock();
     initializeAgents();
     clock_t timeNow = clock() - timeBegin;
     printf("%s,TIMING,INIT,%u,%f\n", simulationName.c_str(),
            simulationNum, ((float) timeNow) / CLOCKS_PER_SEC);
     unsigned outputAgents = parameterMap.at("OUTPUT_AGENTS_AFTER_INIT").getDbl();
-
-    // Age distribution matrices
-    msmAgeDist = CSVParser(parameterMap.at("MSM_AGE_DIST_CSV").stringValue.
-                           c_str(), ",", true).convert_all_entries_to_doubles();
-    wswAgeDist = CSVParser(parameterMap.at("WSW_AGE_DIST_CSV").stringValue.
-                           c_str(), ",", true).convert_all_entries_to_doubles();
-    mswAgeDist = CSVParser(parameterMap.at("MSW_AGE_DIST_CSV").stringValue.
-                           c_str(), ",", true).convert_all_entries_to_doubles();
-    wsmAgeDist = CSVParser(parameterMap.at("WSM_AGE_DIST_CSV").stringValue.
-                           c_str(), ",", true).convert_all_entries_to_doubles();
-
     if (outputAgents)
       printAgents(agents, simulationNum, startDate, stdout);
     unsigned analyzeAgents = parameterMap.
@@ -936,6 +950,8 @@ public:
         // partner infection risk parameters
         setInitialInfection(*partner, initialInfectionRatesMale,
                             initialInfectionRatesFeMale);
+        partner->binomial_p_relationship_length = uni(rng);
+        partner->binomial_p_relationship_wait = uni(rng);
         setAgentInfectionParameters(*partner,
                                     het_male_infectivity,
                                     het_female_infectivity,
@@ -965,6 +981,19 @@ public:
       if (agent->partner)
         agents.push_back(agent->partner);
     }
+  }
+
+  void initializeSimulation()
+  {
+    // Age distribution matrices
+    msmAgeDist = CSVParser(parameterMap.at("MSM_AGE_DIST_CSV").stringValue.
+                           c_str(), ",", true).convert_all_entries_to_doubles();
+    wswAgeDist = CSVParser(parameterMap.at("WSW_AGE_DIST_CSV").stringValue.
+                           c_str(), ",", true).convert_all_entries_to_doubles();
+    mswAgeDist = CSVParser(parameterMap.at("MSW_AGE_DIST_CSV").stringValue.
+                           c_str(), ",", true).convert_all_entries_to_doubles();
+    wsmAgeDist = CSVParser(parameterMap.at("WSM_AGE_DIST_CSV").stringValue.
+                           c_str(), ",", true).convert_all_entries_to_doubles();
   }
 
   void ageEvent()
@@ -1012,6 +1041,7 @@ public:
 
   void breakupEvent()
   {
+    unsigned breakups = 0;
     for (auto& agent: agents) {
       if (agent->partner && currentDate > agent->relationship_change_date) {
         Agent* partner = agent->partner;
@@ -1019,8 +1049,10 @@ public:
         partner->partner = NULL;
         agent->setSingleLength(currentDate, meanDaysSingle);
         partner->setSingleLength(currentDate, meanDaysSingle);
+        ++breakups;
       }
     }
+    totalBreakups += breakups;
   }
 
   void randomMatchEvent()
@@ -1092,6 +1124,7 @@ public:
         unmatchedAgents.push_back(agent);
     }
     shuffle(unmatchedAgents.begin(), unmatchedAgents.end(), rng);
+    printf("D0: %lu %lu\n", unmatchedAgents.size(), partnerships.size());
     return unmatchedAgents;
   }
 
@@ -1211,7 +1244,7 @@ public:
   double distance(const Agent *a, const Agent *b) const
   {
     return distanceMethod == HEURISTIC_DISTANCE
-      ? heuristicDistance(a, b) : distributionDistance(a, b);
+      ? heuristicDistance(a, b) : tableDistance(a, b);
   }
 
   double heuristicDistance(const Agent *a, const Agent *b) const
@@ -1233,7 +1266,7 @@ public:
     return score;
   }
 
-  double distributionDistance(const Agent *a, const Agent *b) const
+  double tableDistance(const Agent *a, const Agent *b) const
   {
     double score = 0.0;
     unsigned a_age = a->age - MIN_AGE;
@@ -1291,6 +1324,7 @@ public:
   double totalPartnershipScore = 0.0;
   unsigned clusters;
   unsigned neighbors;
+  unsigned totalBreakups = 0;
   unsigned totalPartnerships = 0;
   unsigned totalMswPartnerships = 0;
   unsigned totalMsmPartnerships = 0;
@@ -1339,7 +1373,9 @@ void runTests(ParameterMap& parameterMap)
   TESTEQ(partnerships.size() == 2, true, successes, failures);
 
   Simulation simulation(parameterMap, 0);
+  simulation.initializeSimulation();
   simulation.initializeAgents();
+
   TESTEQ(simulation.agents.size(), parameterMap.at("NUM_AGENTS").getDbl(),
          successes, failures);
 
@@ -1373,34 +1409,67 @@ void runTests(ParameterMap& parameterMap)
   simulation.agents[5]->desired_age = 20;
   simulation.agents[5]->sexual_orientation = HOMOSEXUAL;
 
-  double d = simulation.heuristicDistance(simulation.agents[0],
+  double d1 = simulation.heuristicDistance(simulation.agents[0],
                                           simulation.agents[2]);
-  TESTEQ(d, 10.0, successes, failures);
-  d = simulation.heuristicDistance(simulation.agents[0],
+  TESTEQ(d1, 10.0, successes, failures);
+
+  double d2 = simulation.heuristicDistance(simulation.agents[2],
+                                           simulation.agents[0]);
+  TESTEQ(d1, d2, successes, failures);
+
+  d1 = simulation.heuristicDistance(simulation.agents[0],
                                    simulation.agents[3]);
-  TESTEQ(d, 65.0, successes, failures);
-  d = simulation.heuristicDistance(simulation.agents[0],
+  TESTEQ(d1, 65.0, successes, failures);
+  d2 = simulation.heuristicDistance(simulation.agents[3],
+                                    simulation.agents[0]);
+  TESTEQ(d1, d2, successes, failures);
+
+  d1 = simulation.heuristicDistance(simulation.agents[0],
                                    simulation.agents[1]);
-  TESTEQ(d, 62.5, successes, failures);
-  d = simulation.heuristicDistance(simulation.agents[1],
+  TESTEQ(d1, 62.5, successes, failures);
+  d2 = simulation.heuristicDistance(simulation.agents[1],
+                                   simulation.agents[0]);
+  TESTEQ(d1, d2, successes, failures);
+  d1 = simulation.heuristicDistance(simulation.agents[1],
                                    simulation.agents[2]);
-  TESTEQ(d, 57.5, successes, failures);
-  d = simulation.heuristicDistance(simulation.agents[1],
-                                   simulation.agents[3]);
-  TESTEQ(d, 52.5, successes, failures);
-  d = simulation.heuristicDistance(simulation.agents[2],
-                                   simulation.agents[3]);
-  TESTEQ(d, 60, successes, failures);
+  TESTEQ(d1, 57.5, successes, failures);
+  d2 = simulation.heuristicDistance(simulation.agents[2],
+                                    simulation.agents[1]);
+  TESTEQ(d1, d2, successes, failures);
 
-  d = simulation.heuristicDistance(simulation.agents[3],
+  d1 = simulation.heuristicDistance(simulation.agents[1],
+                                   simulation.agents[3]);
+  TESTEQ(d1, 52.5, successes, failures);
+  d1 = simulation.heuristicDistance(simulation.agents[2],
+                                   simulation.agents[3]);
+  TESTEQ(d1, 60, successes, failures);
+
+  d1 = simulation.heuristicDistance(simulation.agents[3],
                                    simulation.agents[4]);
-  TESTEQ(d, 5, successes, failures);
+  TESTEQ(d1, 5, successes, failures);
 
-  d = simulation.heuristicDistance(simulation.agents[1],
+  d1 = simulation.heuristicDistance(simulation.agents[1],
                                    simulation.agents[5]);
-  TESTEQ(d, 7.5, successes, failures);
+  TESTEQ(d1, 7.5, successes, failures);
 
-
+  d1 = simulation.tableDistance(simulation.agents[0],
+                               simulation.agents[3]);
+  TESTEQ(fabs(d1 - 92.85787107631695) < 0.00000000001, true, successes, failures);
+  d2 = simulation.tableDistance(simulation.agents[3],
+                                simulation.agents[0]);
+  TESTEQ(d1, d2, successes, failures);
+  d1 = simulation.tableDistance(simulation.agents[3],
+                                simulation.agents[4]);
+  TESTEQ(fabs(d1 - 21.9126355725) < 0.00000001, true, successes, failures);
+  d2 = simulation.tableDistance(simulation.agents[4],
+                                simulation.agents[3]);
+  TESTEQ(d1, d2, successes, failures);
+  d1 = simulation.tableDistance(simulation.agents[1],
+                                simulation.agents[5]);
+  TESTEQ(fabs(d1 - 0.644530208167975) < 0.00000001, true, successes, failures);
+  d2 = simulation.tableDistance(simulation.agents[5],
+                                simulation.agents[1]);
+  TESTEQ(d1, d2, successes, failures);
   printf("Successes: %u. Failures: %u.\n", successes, failures);
 }
 
