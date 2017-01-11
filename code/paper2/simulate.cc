@@ -831,6 +831,66 @@ public:
     }
   }
 
+  inline void initAgent(Agent *agent,
+                        const unsigned id,
+                        Sample& sampleAgeshare,
+                        const std::vector<double>& femRatio,
+                        const std::vector<double>& wswRate,
+                        const std::vector<double>& msmRate,
+                        const std::vector<double>& initialInfectionRatesMale,
+                        const std::vector<double>& initialInfectionRatesFeMale,
+                        std::vector<Sample>& sample_matWW,
+                        std::vector<Sample>& sample_matMW,
+                        std::vector<Sample>& sample_matWM,
+                        std::vector<Sample>& sample_matMM)
+  {
+    std::uniform_real_distribution<double> uni;
+
+    agent->id = id;
+    // Age
+    unsigned age = sampleAgeshare() + 12;
+    agent->age = age;
+    // Sex
+    unsigned sex = uni(rng) < femRatio[age - 12] ? FEMALE : MALE;
+    agent->sex = sex;
+    // Sexual_Orientation
+    unsigned sexual_orientation;
+    if (sex == FEMALE) {
+      sexual_orientation = uni(rng) < wswRate[age - 12]
+                                      ? HOMOSEXUAL : HETEROSEXUAL;
+    } else {
+      sexual_orientation = uni(rng) < msmRate[age - 12]
+                                      ? HOMOSEXUAL : HETEROSEXUAL;
+    }
+    agent->sexual_orientation = sexual_orientation;
+    setInitialInfection(*agent, initialInfectionRatesMale,
+                        initialInfectionRatesFeMale);
+    // Desire age of partner
+    if (sex == FEMALE && sexual_orientation == HOMOSEXUAL)
+      agent->desired_age  = sample_matWW[age - 12]() + 12;
+    else if (sex == FEMALE && sexual_orientation == HETEROSEXUAL)
+      agent->desired_age = sample_matWM[age - 12]() + 12;
+    else if (sex == MALE && sexual_orientation == HETEROSEXUAL)
+      agent->desired_age = sample_matMW[age - 12]() + 12;
+    else
+      agent->desired_age = sample_matMM[age - 12]() + 12;
+
+    agent->binomial_p_relationship_length = uni(rng);
+    agent->binomial_p_relationship_wait = uni(rng);
+    if (agent->binomial_p_relationship_length >= 0.5 &&
+        agent->binomial_p_relationship_wait >= 0.5) {
+      ++numLongBreakLongPartnership;
+    } else if (agent->binomial_p_relationship_length >= 0.5 &&
+               agent->binomial_p_relationship_wait < 0.5) {
+      ++numShortBreakLongPartnership;
+    } else if (agent->binomial_p_relationship_length < 0.5 &&
+               agent->binomial_p_relationship_wait >= 0.5) {
+      ++numLongBreakShortPartnership;
+    } else {
+      ++numShortBreakShortPartnership;
+    }
+  }
+
   void createPartners(AgentVector& agents,
                       const ParameterMap& parameterMap,
                       const DblMatrix& data,
@@ -884,63 +944,51 @@ public:
     unsigned increment = initial_relation ? 2 : 1;
     for (unsigned i = fromAgent; (i + increment - 1) < toAgent; i += increment) {
       Agent *agent = new Agent();
-      // ID
-      agent->id = i + 1;
-      // Age
-      unsigned age = sample_ageshare() + 12;
-      agent->age = age;
-      // Sex
-      unsigned sex = uni(rng) < femRatio[age - 12] ? FEMALE : MALE;
-      agent->sex = sex;
-      // Sexual_Orientation
-      unsigned sexual_orientation;
-      if (sex == FEMALE) {
-        sexual_orientation = uni(rng) < wswRate[age - 12]
-                                        ? HOMOSEXUAL : HETEROSEXUAL;
-      } else {
-        sexual_orientation = uni(rng) < msmRate[age - 12]
-                                        ? HOMOSEXUAL : HETEROSEXUAL;
-      }
-      agent->sexual_orientation = sexual_orientation;
-      setInitialInfection(*agent, initialInfectionRatesMale,
-                          initialInfectionRatesFeMale);
-      // Desire age of partner
-      if (sex == FEMALE && sexual_orientation == HOMOSEXUAL)
-        agent->desired_age  = sample_matWW[age - 12]() + 12;
-      else if (sex == FEMALE && sexual_orientation == HETEROSEXUAL)
-        agent->desired_age = sample_matWM[age - 12]() + 12;
-      else if (sex == MALE && sexual_orientation == HETEROSEXUAL)
-        agent->desired_age = sample_matMW[age - 12]() + 12;
-      else
-        agent->desired_age = sample_matMM[age - 12]() + 12;
-
-      agent->binomial_p_relationship_length = uni(rng);
-      agent->binomial_p_relationship_wait = uni(rng);
-      setAgentInfectionParameters(*agent,
-                                  het_male_infectivity,
-                                  het_female_infectivity,
-                                  het_male_infectiousness,
-                                  het_female_infectiousness,
-                                  hom_male_infectivity,
-                                  hom_female_infectivity,
-                                  hom_male_infectiousness,
-                                  hom_female_infectiousness);
+      initAgent(agent, i + 1,
+                sample_ageshare,
+                femRatio,
+                wswRate,
+                msmRate,
+                initialInfectionRatesMale,
+                initialInfectionRatesFeMale,
+                sample_matWW,
+                sample_matMW,
+                sample_matWM,
+                sample_matMM);
+    setAgentInfectionParameters(*agent,
+                                het_male_infectivity,
+                                het_female_infectivity,
+                                het_male_infectiousness,
+                                het_female_infectiousness,
+                                hom_male_infectivity,
+                                hom_female_infectivity,
+                                hom_male_infectiousness,
+                                hom_female_infectiousness);
       if (initial_relation) {
         // Relationship
         agent->initial_relationship = true;
         Agent* partner = new Agent();
-        // ID of partner
-        partner->id = i + 2;
+        initAgent(partner, i + 2,
+                  sample_ageshare,
+                  femRatio,
+                  wswRate,
+                  msmRate,
+                  initialInfectionRatesMale,
+                  initialInfectionRatesFeMale,
+                  sample_matWW,
+                  sample_matMW,
+                  sample_matWM,
+                  sample_matMM);
         // Orientation = partner's orientation
-        partner->sexual_orientation = sexual_orientation;
+        partner->sexual_orientation = agent->sexual_orientation;
         // Partner sex
-        if (sexual_orientation == HETEROSEXUAL) {
-          if (sex == MALE)
+        if (agent->sexual_orientation == HETEROSEXUAL) {
+          if (agent->sex == MALE)
             partner->sex = FEMALE;
           else
             partner->sex = MALE;
         } else {
-          partner->sex = sex;
+          partner->sex = agent->sex;
         }
         partner->age = agent->desired_age;
         // Partner in relationship
@@ -950,8 +998,6 @@ public:
         // partner infection risk parameters
         setInitialInfection(*partner, initialInfectionRatesMale,
                             initialInfectionRatesFeMale);
-        partner->binomial_p_relationship_length = uni(rng);
-        partner->binomial_p_relationship_wait = uni(rng);
         setAgentInfectionParameters(*partner,
                                     het_male_infectivity,
                                     het_female_infectivity,
@@ -1002,6 +1048,38 @@ public:
       agent->age += timeStep;
   }
 
+  void trackRiskFactors(Agent* agent)
+  {
+    if (agent->sex == MALE) {
+      ++numInfectedMales;
+      ++infectedMalesByAge[ (int) agent->age / ageInterval];
+      if (agent->sexual_orientation == HETEROSEXUAL)
+        ++numInfectedMsw;
+      else
+        ++numInfectedMsm;
+    } else {
+      ++numInfectedFemales;
+      ++infectedFemalesByAge[ (int) agent->age / ageInterval];
+      if (agent->sexual_orientation == HETEROSEXUAL)
+        ++numInfectedWsm;
+      else
+        ++numInfectedWsw;
+    }
+
+    if (agent->binomial_p_relationship_length >= 0.5 &&
+        agent->binomial_p_relationship_wait >= 0.5) {
+      ++numInfectedLongBreakLongPartnership;
+    } else if (agent->binomial_p_relationship_length >= 0.5 &&
+               agent->binomial_p_relationship_wait < 0.5) {
+      ++numInfectedShortBreakLongPartnership;
+    } else if (agent->binomial_p_relationship_length < 0.5 &&
+               agent->binomial_p_relationship_wait >= 0.5) {
+      ++numInfectedLongBreakShortPartnership;
+    } else {
+      ++numInfectedShortBreakShortPartnership;
+    }
+  }
+
   void infectionEvent()
   {
     std::uniform_real_distribution<double> dist(0.0, 1.0);
@@ -1019,21 +1097,7 @@ public:
           agent->infected = true;
           agent->infector = agent->partner;
           ++agent->partner->num_infected;
-          if (agent->sex == MALE) {
-            ++numInfectedMales;
-            ++infectedMalesByAge[ (int) agent->age / ageInterval];
-            if (agent->sexual_orientation == HETEROSEXUAL)
-              ++numInfectedMsw;
-            else
-              ++numInfectedMsm;
-          } else {
-            ++numInfectedFemales;
-            ++infectedFemalesByAge[ (int) agent->age / ageInterval];
-            if (agent->sexual_orientation == HETEROSEXUAL)
-              ++numInfectedWsm;
-            else
-              ++numInfectedWsw;
-          }
+          trackRiskFactors(agent);
         }
       }
     }
@@ -1124,7 +1188,6 @@ public:
         unmatchedAgents.push_back(agent);
     }
     shuffle(unmatchedAgents.begin(), unmatchedAgents.end(), rng);
-    printf("D0: %lu %lu\n", unmatchedAgents.size(), partnerships.size());
     return unmatchedAgents;
   }
 
@@ -1178,6 +1241,27 @@ public:
     printf("%s,ANALYSIS,WSWPARTNERSHIPS,%d,%.3f,%u\n",
            simulationName.c_str(), simulationNum, currentDate,
            totalWswPartnerships);
+
+    double rateShortBreakShortPartnership = (double)
+      numInfectedShortBreakShortPartnership / numShortBreakShortPartnership;
+    double rateShortBreakLongPartnership = (double)
+      numInfectedShortBreakLongPartnership /  numShortBreakLongPartnership;
+    double rateLongBreakShortPartnership = (double)
+      numInfectedLongBreakShortPartnership / numLongBreakShortPartnership;
+    double rateLongBreakLongPartnership = (double)
+      numInfectedLongBreakLongPartnership / numLongBreakLongPartnership;
+    printf("%s,ANALYSIS,SHORTBREAK_SHORTPARTNERSHIP,%d,%.3f,%.3f\n",
+           simulationName.c_str(), simulationNum, currentDate,
+           rateShortBreakShortPartnership);
+    printf("%s,ANALYSIS,SHORTBREAK_LONGPARTNERSHIP,%d,%.3f,%.3f\n",
+           simulationName.c_str(), simulationNum, currentDate,
+           rateShortBreakLongPartnership);
+    printf("%s,ANALYSIS,LONGBREAK_SHORTPARTNERSHIP,%d,%.3f,%.3f\n",
+           simulationName.c_str(), simulationNum, currentDate,
+           rateLongBreakShortPartnership);
+    printf("%s,ANALYSIS,LONGBREAK_LONGPARTNERSHIP,%d,%.3f,%.3f\n",
+           simulationName.c_str(), simulationNum, currentDate,
+           rateLongBreakLongPartnership);
 
     for (unsigned i = 0; i < malesByAge.size(); ++i) {
       ostringstream ssmale, ssfemale;
@@ -1341,6 +1425,14 @@ public:
   unsigned numInfectedMsw = 0;
   unsigned numInfectedWsm = 0;
   unsigned numInfectedWsw = 0;
+  unsigned numShortBreakShortPartnership = 0;
+  unsigned numShortBreakLongPartnership = 0;
+  unsigned numLongBreakShortPartnership = 0;
+  unsigned numLongBreakLongPartnership = 0;
+  unsigned numInfectedShortBreakShortPartnership = 0;
+  unsigned numInfectedShortBreakLongPartnership = 0;
+  unsigned numInfectedLongBreakShortPartnership = 0;
+  unsigned numInfectedLongBreakLongPartnership = 0;
   unsigned poorMatches = 0;
   unsigned failedMatches = 0;
   std::vector<unsigned> malesByAge;

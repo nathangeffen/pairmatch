@@ -21,7 +21,8 @@ public:
     double* p = &prob[0];
     ransampl_set(ws_, p);
   };
-  unsigned operator()() {
+  unsigned operator()()
+  {
     return (unsigned) ransampl_draw(ws_, uni_(*rng_), uni_(*rng_));
   };
   ~Sample() {
