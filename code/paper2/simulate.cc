@@ -434,18 +434,22 @@ public:
   void setRelationshipLength(const double current_date,
                              const double mean_days_relationship)
   {
+    /* This needs to be replaced with Stefan's relationship status equations. */
     double p = (binomial_p_relationship_length +
                 partner->binomial_p_relationship_length) / 2.0;
     std::binomial_distribution<int> dist (mean_days_relationship, p);
     double num_days = (double) dist(rng) * DAY;
+    /****************************************/
     relationship_change_date = current_date + num_days;
     partner->relationship_change_date = relationship_change_date;
   }
   void setSingleLength(double current_date,
                        double mean_days_single)
   {
+    /* This needs to be replaced with Stefan's relationship status equations. */
     std::binomial_distribution<int> dist (mean_days_single,
                                           binomial_p_relationship_wait);
+    /****************************************/
     relationship_change_date = current_date + (double) dist(rng) * DAY;
   }
 
