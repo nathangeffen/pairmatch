@@ -245,6 +245,8 @@ void setDefaultParameters(ParameterMap& parameterMap)
                "Name of simulation used in output", "Default");
   addParameter(parameterMap, "NUM_SIMULATIONS",
                "Number of simulations to execute (default is 1)", {1});
+  addParameter(parameterMap, "NUM_THREADS",
+               "Number of threads (default is one per simulation - 0)", {0});
   addParameter(parameterMap, "NUM_AGENTS", "Number of agents", {100.0});
   addParameter(parameterMap, "MALE_INFECTIVITY", "How easily males are infected",
                {0.1});
@@ -1649,12 +1651,21 @@ int main(int argc, char *argv[])
     if (parameterMap.at("PRINT_PARAMETERS").getDbl() == 1)
       printParameters(parameterMap);
     else {
+      unsigned numThreads = parameterMap.at("NUM_THREADS").getDbl();
       unsigned numSimulations = parameterMap.at("NUM_SIMULATIONS").getDbl();
-      std::thread t[numSimulations];
-      for (unsigned i = 0; i < numSimulations; ++i)
-        t[i] = std::thread(callSimulation, std::ref(parameterMap), i);
-      for (unsigned i = 0; i < numSimulations; ++i)
-        t[i].join();
+      if (numThreads == 0) numThreads = numSimulations;
+      unsigned simulationsRun = 0;
+      while(simulationsRun < numSimulations) {
+        if (simulationsRun + numThreads > numSimulations)
+          numThreads = numSimulations - simulationsRun;
+        std::thread t[numThreads];
+        for (unsigned i = 0; i < numThreads; ++i)
+          t[i] = std::thread(callSimulation, std::ref(parameterMap),
+                             simulationsRun + i);
+        for (unsigned i = 0; i < numThreads; ++i)
+          t[i].join();
+        simulationsRun += numThreads;
+      }
     }
   }
 }

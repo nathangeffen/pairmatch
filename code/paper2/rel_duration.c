@@ -20,10 +20,13 @@
   # rel_part_ecr
 
   1. Is 0 FEMALE and 1 MALE?
+  0 is FEMALE
 
   2. Is 0 HOMOSEXUAL and 1 HETEROSEXUAL?
+  0 is HETEROSEXUAL
 
   3. Is rel_part_ecr returning the number of days in the relationship?
+  Gives the day in the simulation at which the relationship will end.
 
   4. For a new relationship, both agents have to end the relationship on
   the same day. As the code stands at the moment, only one agent is considered.
@@ -55,6 +58,7 @@
   I've done.
 
   4. Not sure what ITERS is. I set it to 100.
+  Day in simulation.
 
  */
 
