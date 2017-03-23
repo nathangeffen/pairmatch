@@ -1,4 +1,4 @@
-inp = read.csv("output.csv", FALSE)
+inp = read.csv("output2.csv", FALSE)
 timings = inp[grepl("TIMING",inp$V2),]
 timings = timings[grepl("AFTER",timings$V3),]
 mean_timings = aggregate(timings$V5, by=list(timings$V1),FUN=mean)
