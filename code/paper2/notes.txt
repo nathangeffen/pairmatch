@@ -1,0 +1,6 @@
+TIME TAKEN TO RUN parms_20k_3yr.txt on 25 March 2017 on Lenovo laptop 
+2000 simulations * RPM,CPM,RKPM * 0.1,0.01,0.001 on 20k population, daily for three years (i.e. 18000 simulations)
+real	204m8.568s
+user	798m32.448s
+sys	    0m59.036s
+

@@ -737,27 +737,6 @@ public:
   void simulate()
   {
     unsigned timing = parameterMap.at("TIMING").getDbl();
-    // Events to execute
-
-    //bool execAgeEvent = (parameterMap.at("AGE_EVENT").getDbl() == 1)
-    //  ? true : false;
-    //bool execInfectEvent = (parameterMap.at("INFECT_EVENT").getDbl() == 1)
-    //  ? true : false;
-    //bool execBreakupEvent = (parameterMap.at("BREAKUP_EVENT").getDbl() == 1)
-    //  ? true : false;
-    // unsigned matchEvent;
-    // string s = parameterMap.at("MATCH_EVENT").getStr();
-    // if (s == "RPM")
-    //   matchEvent = RPM;
-    // else if (s == "RKPM")
-    //   matchEvent = RKPM;
-    // else if (s == "CSPM")
-    //   matchEvent = CSPM;
-    // else {
-    //   fprintf(stderr, "Unknown matching algorithm.\n");
-    //   exit(1);
-    // }
-
 
     // Initialization
     initializeSimulation();
@@ -793,15 +772,7 @@ public:
       parameterMap.at("ANALYZE_DURING_SIM").getDbl(1);
     for (unsigned i = 0; i < num_iterations; ++i, currentDate += timeStep) {
       for (auto& e: events) e(this);
-      /* Execute events */
-      //if (execAgeEvent) ageEvent();
-      //if (execInfectEvent) infectionEvent();
-      //if (execBreakupEvent) breakupEvent();
-      // switch(matchEvent) {
-      // case RPM: randomMatchEvent(); break;
-      // case RKPM: randomKMatchEvent(); break;
-      // case CSPM: clusterShuffleMatchEvent(); break;
-      // }
+
       if (timing > 0 && (i + 1) % timing == 0) {
         timeNow = clock() - timeBegin;
         printf("%s,TIMING,%u,%u,%f\n",
