@@ -1,0 +1,205 @@
+set -x
+set -e
++ set -e
+
+echo "Arguments:" $0 $1
++ echo Arguments: ./run_tests.sh
+Arguments: ./run_tests.sh
+
+echo "Starting time: "
++ echo 'Starting time: '
+Starting time: 
+date
++ date
+Mon Aug  8 22:21:20 CEST 2016
+
+if [ "$1" != "skip" ]
+    then
+    ./germany_partners-rel -s $RANDOM -a I -n 10000 -o
+    mv Initialpop_0_0.csv agent_input_10000.csv
+
+    ./germany_partners-rel -s $RANDOM -a I -n 50000 -o
+    mv Initialpop_0_0.csv agent_input_50000.csv
+
+    ./germany_partners-rel -s $RANDOM -a I -n 100000 -o
+    mv Initialpop_0_0.csv agent_input_100000.csv
+
+    ./germany_partners-rel -s $RANDOM -a I -n 250000 -o
+    mv Initialpop_0_0.csv agent_input_250000.csv
+
+    ./germany_partners-rel -s $RANDOM -a I -n 500000 -o
+    mv Initialpop_0_0.csv agent_input_500000.csv
+
+    ./germany_partners-rel -s $RANDOM -a I -n 750000 -o
+    mv Initialpop_0_0.csv agent_input_750000.csv
+
+    ./germany_partners-rel -s $RANDOM -a I -n 1000000 -o
+    mv Initialpop_0_0.csv agent_input_1000000.csv
+fi
++ '[' '' '!=' skip ']'
++ ./germany_partners-rel -s 25790 -a I -n 10000 -o
+alg,run,k,c,tomatch,success,rate,avgk,time
+Initialpop,0,350,100,6592,6592,1,0,0.014262
++ mv Initialpop_0_0.csv agent_input_10000.csv
++ ./germany_partners-rel -s 1706 -a I -n 50000 -o
+alg,run,k,c,tomatch,success,rate,avgk,time
+Initialpop,0,350,100,32964,32964,1,0,0.019097
++ mv Initialpop_0_0.csv agent_input_50000.csv
++ ./germany_partners-rel -s 3606 -a I -n 100000 -o
+alg,run,k,c,tomatch,success,rate,avgk,time
+Initialpop,0,350,100,65928,65928,1,0,0.025389
++ mv Initialpop_0_0.csv agent_input_100000.csv
++ ./germany_partners-rel -s 32568 -a I -n 250000 -o
+alg,run,k,c,tomatch,success,rate,avgk,time
+Initialpop,0,350,100,164820,164820,1,0,0.044489
++ mv Initialpop_0_0.csv agent_input_250000.csv
++ ./germany_partners-rel -s 21022 -a I -n 500000 -o
+alg,run,k,c,tomatch,success,rate,avgk,time
+Initialpop,0,350,100,329640,329640,1,0,0.076388
++ mv Initialpop_0_0.csv agent_input_500000.csv
++ ./germany_partners-rel -s 23876 -a I -n 750000 -o
+alg,run,k,c,tomatch,success,rate,avgk,time
+Initialpop,0,350,100,494462,494462,1,0,0.110236
++ mv Initialpop_0_0.csv agent_input_750000.csv
++ ./germany_partners-rel -s 12635 -a I -n 1000000 -o
+alg,run,k,c,tomatch,success,rate,avgk,time
+Initialpop,0,350,100,659282,659282,1,0,0.139746
++ mv Initialpop_0_0.csv agent_input_1000000.csv
+
+
+# Fixed k,c runs for timing
+
+./germany_partners-rel -s $RANDOM -a 30,IRKWCD -n 10000 -k 75 -c 215 >output_fixed_10000.csv &
+
+./germany_partners-rel -s $RANDOM -a 30,IRKWCD -n 50000 -k 225 -c 565 >output_fixed_50000.csv &
+
+./germany_partners-rel -s $RANDOM -a 30,IRKWCD -n 100000 -k 225 -c 565 >output_fixed_100000.csv &
++ ./germany_partners-rel -s 15586 -a 30,IRKWCD -n 10000 -k 75 -c 215
+
+./germany_partners-rel -s $RANDOM -a 30,IRKWCD -n 250000 -k 740 -c 1280 >output_fixed_250000.csv &
++ ./germany_partners-rel -s 3461 -a 30,IRKWCD -n 50000 -k 225 -c 565
+
+./germany_partners-rel -s $RANDOM -a 30,IRKWCD -n 500000 -k 1620 -c 1700 >output_fixed_500000.csv &
++ ./germany_partners-rel -s 23145 -a 30,IRKWCD -n 100000 -k 225 -c 565
++ ./germany_partners-rel -s 16264 -a 30,IRKWCD -n 250000 -k 740 -c 1280
+
+./germany_partners-rel -s $RANDOM -a 30,IRKWCD -n 750000 -k 2170 -c 810 >output_fixed_750000.csv &
++ ./germany_partners-rel -s 16603 -a 30,IRKWCD -n 500000 -k 1620 -c 1700
+
+./germany_partners-rel -s $RANDOM -a 30,IRKWCD -n 1000000 -k 2800 -c 3900 >output_fixed_1000000.csv &
++ ./germany_partners-rel -s 25002 -a 30,IRKWCD -n 750000 -k 2170 -c 810
+
+wait
++ wait
++ ./germany_partners-rel -s 300 -a 30,IRKWCD -n 1000000 -k 2800 -c 3900
+
+./germany_partners-rel -i agent_input_10000.csv -s $RANDOM -k 5 -c 5 -vk 10 -vc 10 -vt 30 -r 900 -a C >output_var_C_10000.csv &
+
+./germany_partners-rel -i agent_input_50000.csv -s $RANDOM -k 5 -c 5 -vk 20 -vc 20 -vt 30 -r 900 -a C >output_var_C_50000.csv &
+
+./germany_partners-rel -i agent_input_100000.csv -s $RANDOM -k 50 -c 50 -vk 40 -vc 40 -vt 30 -r 900 -a C >output_var_C_100000.csv &
++ ./germany_partners-rel -i agent_input_10000.csv -s 2053 -k 5 -c 5 -vk 10 -vc 10 -vt 30 -r 900 -a C
+
+./germany_partners-rel -i agent_input_250000.csv -s $RANDOM -k 80 -c 80 -vk 60 -vc 60 -vt 30 -r 900 -a C >output_var_C_250000.csv &
++ ./germany_partners-rel -i agent_input_50000.csv -s 15815 -k 5 -c 5 -vk 20 -vc 20 -vt 30 -r 900 -a C
++ ./germany_partners-rel -i agent_input_100000.csv -s 3577 -k 50 -c 50 -vk 40 -vc 40 -vt 30 -r 900 -a C
+
+./germany_partners-rel -i agent_input_500000.csv -s $RANDOM -k 100 -c 100 -vk 80 -vc 80 -vt 30 -r 900 -a C >output_var_C_500000.csv &
++ ./germany_partners-rel -i agent_input_250000.csv -s 29916 -k 80 -c 80 -vk 60 -vc 60 -vt 30 -r 900 -a C
+
+./germany_partners-rel -i agent_input_750000.csv -s $RANDOM -k 90 -c 90 -vk 90 -vc 90 -vt 35 -r 1225 -a C >output_var_C_750000.csv &
+
+./germany_partners-rel -i agent_input_1000000.csv -s $RANDOM -k 100 -c 100 -vk 100 -vc 100 -vt 40 -r 1600 -a C >output_var_C_1000000.csv &
++ ./germany_partners-rel -i agent_input_750000.csv -s 28835 -k 90 -c 90 -vk 90 -vc 90 -vt 35 -r 1225 -a C
+
+wait
++ wait
++ ./germany_partners-rel -i agent_input_1000000.csv -s 23365 -k 100 -c 100 -vk 100 -vc 100 -vt 40 -r 1600 -a C
+
+./germany_partners-rel -i agent_input_10000.csv -s $RANDOM -k 5 -vk 10 -r 50 -a D >output_var_D_10000.csv &
+
+./germany_partners-rel -i agent_input_50000.csv -s $RANDOM -k 5 -vk 20 -r 50 -a D >output_var_D_50000.csv &
+
+./germany_partners-rel -i agent_input_100000.csv -s $RANDOM -k 50 -vk 40 -r 50 -a D >output_var_D_100000.csv &
++ ./germany_partners-rel -i agent_input_10000.csv -s 21966 -k 5 -vk 10 -r 50 -a D
+
+./germany_partners-rel -i agent_input_250000.csv -s $RANDOM -k 80 -vk 60 -r 50 -a D >output_var_D_250000.csv &
+
+./germany_partners-rel -i agent_input_500000.csv -s $RANDOM -k 100 -vk 80 -r 50 -a D >output_var_D_500000.csv &
++ ./germany_partners-rel -i agent_input_50000.csv -s 17904 -k 5 -vk 20 -r 50 -a D
+
+./germany_partners-rel -i agent_input_750000.csv -s $RANDOM -k 100 -vk 90 -r 50 -a D >output_var_D_750000.csv &
+
+./germany_partners-rel -i agent_input_1000000.csv -s $RANDOM -k 100 -vk 100 -r 50 -a D >output_var_D_1000000.csv &
++ ./germany_partners-rel -i agent_input_100000.csv -s 5495 -k 50 -vk 40 -r 50 -a D
+
+wait
++ wait
++ ./germany_partners-rel -i agent_input_250000.csv -s 30478 -k 80 -vk 60 -r 50 -a D
++ ./germany_partners-rel -i agent_input_500000.csv -s 31400 -k 100 -vk 80 -r 50 -a D
++ ./germany_partners-rel -i agent_input_750000.csv -s 1845 -k 100 -vk 90 -r 50 -a D
++ ./germany_partners-rel -i agent_input_1000000.csv -s 4215 -k 100 -vk 100 -r 50 -a D
+
+Rscript analyse_output.R
++ Rscript analyse_output.R
+During startup - Warning messages:
+1: Setting LC_CTYPE failed, using "C" 
+2: Setting LC_COLLATE failed, using "C" 
+3: Setting LC_TIME failed, using "C" 
+4: Setting LC_MONETARY failed, using "C" 
+[1] "Best values of k for cluster shuffle"
+        n    k rate
+1   10000   85    1
+2   50000  365    1
+3  100000  610    1
+4  250000 1340    1
+5  500000 2340    1
+6  750000 2790    1
+7 1000000 3700    1
+null device 
+          1 
+[1] "Best values of c for cluster shuffle"
+        n   c rate
+1   10000  65    1
+2   50000 165    1
+3  100000 170    1
+4  250000 320    1
+5  500000 900    1
+6  750000 720    1
+7 1000000 500    1
+null device 
+          1 
+[1] "Best values of c for best values k for cluster shuffle"
+     k    c rate       n
+1   85  265    1   10000
+2  365  365    1   50000
+3  610  770    1  100000
+4 1340  860    1  250000
+5 2340  900    1  500000
+6 2790 1980    1  750000
+7 3700 3600    1 1000000
+null device 
+          1 
+[1] "Best values of k for distribution match"
+        n    k rate
+1   10000   45    1
+2   50000  185    1
+3  100000  370    1
+4  250000  860    1
+5  500000 1700    1
+6  750000 2530    1
+7 1000000 3400    1
+null device 
+          1 
+The following objects are masked _by_ .GlobalEnv:
+
+    c, k
+null device 
+          1 
+
+echo "Ending at:"
++ echo 'Ending at:'
+Ending at:
+date
++ date
+Mon Aug  8 22:47:53 CEST 2016

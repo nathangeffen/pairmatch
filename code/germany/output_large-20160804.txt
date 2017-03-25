@@ -1,0 +1,29 @@
+set -x
+set -e
++ set -e
+
+echo "Starting time: "
++ echo 'Starting time: '
+Starting time: 
+date
++ date
+Thu Aug  4 06:52:27 CEST 2016
+
+Rscript step2.R 80620000 1
++ Rscript step2.R 80620000 1
+During startup - Warning messages:
+1: Setting LC_CTYPE failed, using "C" 
+2: Setting LC_COLLATE failed, using "C" 
+3: Setting LC_TIME failed, using "C" 
+4: Setting LC_MONETARY failed, using "C" 
+The creation of 27468637 single agents took 24.48 seconds, 
+The creation of 53151362 agents in partnerships took 1.07 seconds, 
+mv agent_list.csv agent_input_80620000.csv
++ mv agent_list.csv agent_input_80620000.csv
+
+echo "Ending at:"
++ echo 'Ending at:'
+Ending at:
+date
++ date
+Thu Aug  4 08:40:59 CEST 2016

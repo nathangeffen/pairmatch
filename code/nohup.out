@@ -1,0 +1,136 @@
+Running all tests.
+Running timing tests for algorithms
+rm -f partnermatch
+g++ -O3 -std=c++11  -o partnermatch partnermatch.cc
+/tmp/ccfXsj1q.o: In function `Simulation::blossom()':
+partnermatch.cc:(.text._ZN10Simulation7blossomEv[_ZN10Simulation7blossomEv]+0x12e): warning: the use of `tmpnam' is dangerous, better use `mkstemp'
+During startup - Warning messages:
+1: Setting LC_CTYPE failed, using "C" 
+2: Setting LC_COLLATE failed, using "C" 
+3: Setting LC_TIME failed, using "C" 
+4: Setting LC_MONETARY failed, using "C" 
+Loading required package: xtable
+Running timing tests for CSPM on increasing agents
+rm -f partnermatch
+g++ -O3 -std=c++11  -o partnermatch partnermatch.cc
+/tmp/cc97rxFx.o: In function `Simulation::blossom()':
+partnermatch.cc:(.text._ZN10Simulation7blossomEv[_ZN10Simulation7blossomEv]+0x12e): warning: the use of `tmpnam' is dangerous, better use `mkstemp'
+During startup - Warning messages:
+1: Setting LC_CTYPE failed, using "C" 
+2: Setting LC_COLLATE failed, using "C" 
+3: Setting LC_TIME failed, using "C" 
+4: Setting LC_MONETARY failed, using "C" 
+Loading required package: xtable
+Running timing tests for CSPM on k
+rm -f partnermatch
+g++ -O3 -std=c++11  -o partnermatch partnermatch.cc
+/tmp/cc5e9Qu3.o: In function `Simulation::blossom()':
+partnermatch.cc:(.text._ZN10Simulation7blossomEv[_ZN10Simulation7blossomEv]+0x12e): warning: the use of `tmpnam' is dangerous, better use `mkstemp'
+During startup - Warning messages:
+1: Setting LC_CTYPE failed, using "C" 
+2: Setting LC_COLLATE failed, using "C" 
+3: Setting LC_TIME failed, using "C" 
+4: Setting LC_MONETARY failed, using "C" 
+Loading required package: xtable
+Running STI effectiveness tests:5000
+rm: cannot remove 'output5kS_??.csv': No such file or directory
+rm -f partnermatch
+g++ -O3 -std=c++11  -o partnermatch partnermatch.cc
+/tmp/ccjocDde.o: In function `Simulation::blossom()':
+partnermatch.cc:(.text._ZN10Simulation7blossomEv[_ZN10Simulation7blossomEv]+0x12e): warning: the use of `tmpnam' is dangerous, better use `mkstemp'
+Analyzing STI effectiveness tests:5000
+rm: cannot remove 'output5kS.csv': No such file or directory
+During startup - Warning messages:
+1: Setting LC_CTYPE failed, using "C" 
+2: Setting LC_COLLATE failed, using "C" 
+3: Setting LC_TIME failed, using "C" 
+4: Setting LC_MONETARY failed, using "C" 
+Loading required package: xtable
+Running ATTRACTOR effectiveness tests:5000
+rm -f partnermatch
+g++ -O3 -std=c++11 -D ATTRACT_REJECT -o partnermatch partnermatch.cc
+/tmp/cc4kRD3C.o: In function `Simulation::blossom()':
+partnermatch.cc:(.text._ZN10Simulation7blossomEv[_ZN10Simulation7blossomEv]+0xe5): warning: the use of `tmpnam' is dangerous, better use `mkstemp'
+During startup - Warning messages:
+1: Setting LC_CTYPE failed, using "C" 
+2: Setting LC_COLLATE failed, using "C" 
+3: Setting LC_TIME failed, using "C" 
+4: Setting LC_MONETARY failed, using "C" 
+Loading required package: xtable
+During startup - Warning messages:
+1: Setting LC_CTYPE failed, using "C" 
+2: Setting LC_COLLATE failed, using "C" 
+3: Setting LC_TIME failed, using "C" 
+4: Setting LC_MONETARY failed, using "C" 
+Loading required package: xtable
+During startup - Warning messages:
+1: Setting LC_CTYPE failed, using "C" 
+2: Setting LC_COLLATE failed, using "C" 
+3: Setting LC_TIME failed, using "C" 
+4: Setting LC_MONETARY failed, using "C" 
+Loading required package: xtable
+During startup - Warning messages:
+1: Setting LC_CTYPE failed, using "C" 
+2: Setting LC_COLLATE failed, using "C" 
+3: Setting LC_TIME failed, using "C" 
+4: Setting LC_MONETARY failed, using "C" 
+Loading required package: xtable
+During startup - Warning messages:
+1: Setting LC_CTYPE failed, using "C" 
+2: Setting LC_COLLATE failed, using "C" 
+3: Setting LC_TIME failed, using "C" 
+4: Setting LC_MONETARY failed, using "C" 
+Loading required package: xtable
+During startup - Warning messages:
+1: Setting LC_CTYPE failed, using "C" 
+2: Setting LC_COLLATE failed, using "C" 
+3: Setting LC_TIME failed, using "C" 
+4: Setting LC_MONETARY failed, using "C" 
+Loading required package: xtable
+Running STI effectiveness tests:20000
+rm: cannot remove 'output20kS_??.csv': No such file or directory
+rm -f partnermatch
+g++ -O3 -std=c++11  -o partnermatch partnermatch.cc
+/tmp/ccPYSbJD.o: In function `Simulation::blossom()':
+partnermatch.cc:(.text._ZN10Simulation7blossomEv[_ZN10Simulation7blossomEv]+0x12e): warning: the use of `tmpnam' is dangerous, better use `mkstemp'
+Analyzing STI effectiveness tests:20000
+rm: cannot remove 'output20kS.csv': No such file or directory
+During startup - Warning messages:
+1: Setting LC_CTYPE failed, using "C" 
+2: Setting LC_COLLATE failed, using "C" 
+3: Setting LC_TIME failed, using "C" 
+4: Setting LC_MONETARY failed, using "C" 
+Loading required package: xtable
+During startup - Warning messages:
+1: Setting LC_CTYPE failed, using "C" 
+2: Setting LC_COLLATE failed, using "C" 
+3: Setting LC_TIME failed, using "C" 
+4: Setting LC_MONETARY failed, using "C" 
+Loading required package: xtable
+Running K tests
+rm -f partnermatch
+g++ -O3 -std=c++11  -o partnermatch partnermatch.cc
+/tmp/ccDPCZ5g.o: In function `Simulation::blossom()':
+partnermatch.cc:(.text._ZN10Simulation7blossomEv[_ZN10Simulation7blossomEv]+0x12e): warning: the use of `tmpnam' is dangerous, better use `mkstemp'
+During startup - Warning messages:
+1: Setting LC_CTYPE failed, using "C" 
+2: Setting LC_COLLATE failed, using "C" 
+3: Setting LC_TIME failed, using "C" 
+4: Setting LC_MONETARY failed, using "C" 
+[1] "K analysis"
+null device 
+          1 
+Running C tests
+rm: cannot remove 'output20k_c????.csv': No such file or directory
+rm -f partnermatch
+g++ -O3 -std=c++11  -o partnermatch partnermatch.cc
+/tmp/cc3lGBDY.o: In function `Simulation::blossom()':
+partnermatch.cc:(.text._ZN10Simulation7blossomEv[_ZN10Simulation7blossomEv]+0x12e): warning: the use of `tmpnam' is dangerous, better use `mkstemp'
+During startup - Warning messages:
+1: Setting LC_CTYPE failed, using "C" 
+2: Setting LC_COLLATE failed, using "C" 
+3: Setting LC_TIME failed, using "C" 
+4: Setting LC_MONETARY failed, using "C" 
+[1] "C analysis"
+null device 
+          1 
