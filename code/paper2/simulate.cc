@@ -23,7 +23,7 @@
 
 #include <cfloat>
 #include <cstdint>
-#include <ctime>
+#include <sys/time.h>
 
 #include <boost/algorithm/string.hpp>
 
@@ -740,14 +740,17 @@ public:
 
     // Initialization
     initializeSimulation();
-    clock_t timeBegin = clock();
+    struct timeval timeBegin, timeEnd;
+    double elapsedTime;
+
+    gettimeofday(&timeBegin, NULL);
     initializeAgents();
-    clock_t timeNow = clock() - timeBegin;
+    gettimeofday(&timeEnd, NULL);
+    elapsedTime = timeEnd.tv_sec - timeBegin.tv_sec;
     printf("%s,TIMING,INIT,%u,%f\n", simulationName.c_str(),
-           simulationNum, ((float) timeNow) / CLOCKS_PER_SEC);
+           simulationNum, elapsedTime);
     unsigned outputAgents = parameterMap.at("OUTPUT_AGENTS_AFTER_INIT").getDbl();
-    if (outputAgents)
-      printAgents(agents, simulationNum, startDate, stdout);
+    if (outputAgents) printAgents(agents, simulationNum, startDate, stdout);
     /********************/
     /* Count WSW */
     unsigned wswcount = 0;
@@ -774,10 +777,10 @@ public:
       for (auto& e: events) e(this);
 
       if (timing > 0 && (i + 1) % timing == 0) {
-        timeNow = clock() - timeBegin;
+        gettimeofday(&timeEnd, NULL);
+        elapsedTime = timeEnd.tv_sec - timeBegin.tv_sec;
         printf("%s,TIMING,%u,%u,%f\n",
-               simulationName.c_str(), i, simulationNum,
-               ( (float) timeNow) / CLOCKS_PER_SEC);
+               simulationName.c_str(), i, simulationNum, elapsedTime);
       }
       if (outputAgents > 0 && (i + 1) % outputFrequency == 0)
         printAgents(agents, simulationNum, currentDate, stdout);
@@ -785,10 +788,10 @@ public:
         analysis();
     }
 
-    timeNow = clock() - timeBegin;
+    gettimeofday(&timeEnd, NULL);
+    elapsedTime = timeEnd.tv_sec - timeBegin.tv_sec;
     printf("%s,TIMING,AFTER,%u,%f\n",
-           simulationName.c_str(), simulationNum,
-           ( (float) timeNow) / CLOCKS_PER_SEC);
+           simulationName.c_str(), simulationNum, elapsedTime);
 
     /* Wrap up */
     outputAgents = parameterMap.at("OUTPUT_AGENTS_AT_END").getDbl();
