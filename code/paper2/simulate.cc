@@ -496,22 +496,26 @@ public:
   uint32_t id = 0;
   Agent* partner;
   Agent* infector = NULL;
-  double het_infectivity;
-  double het_infectiousness;
-  double hom_infectivity;
-  double hom_infectiousness;
+
+  float het_infectivity;
+  float het_infectiousness;
+  float hom_infectivity;
+  float hom_infectiousness;
+  float age;
+  float desired_age;
+  float relationship_change_date;
+  float binomial_p_relationship_length;
+  float binomial_p_relationship_wait;
+  float weight;
+
+  unsigned short sex;
+  unsigned short sexual_orientation;
   bool infected;
   bool initial_relationship;
-  double age;
-  unsigned sex;
-  unsigned sexual_orientation;
-  double desired_age;
-  double relationship_change_date;
-  double binomial_p_relationship_length;
-  double binomial_p_relationship_wait;
+
   unsigned num_partners = 0;
   unsigned num_infected = 0;
-  double weight;
+
 
   void setRelationshipLength(const double current_date,
                              const double mean_days_relationship)
@@ -861,6 +865,7 @@ public:
 
     unsigned X = parameterMap.at("NUM_AGENTS").values[0];
     unsigned S = calcNumberSingles(data, X);
+    agents.reserve(X);
 
     std::vector<double> ageRange;
     for (unsigned i = 12; i <= 100; ++i)
@@ -916,6 +921,7 @@ public:
         }
       }
     }
+    agents.shrink_to_fit();
   }
 
   inline void initAgent(Agent *agent,
@@ -1181,6 +1187,7 @@ public:
         unmatchedAgents.push_back(agent);
     }
     shuffle(unmatchedAgents.begin(), unmatchedAgents.end(), rng);
+    unmatchedAgents.shrink_to_fit();
     return unmatchedAgents;
   }
 
@@ -1730,6 +1737,9 @@ void callSimulation(ParameterMap& parameterMap, const unsigned simulationNum)
 
 int main(int argc, char *argv[])
 {
+  std::cout << "Agent: " << sizeof(Agent) << std::endl;
+  std::cout << "Simulation: " << sizeof(Simulation) << std::endl;
+  std::cout << "Partnership: " << sizeof(Partnerships) << std::endl;
   if (cmdOptionExists(argv, argv + argc, "-h")) {
     printf("%s options, where options are:\n"
            "-h: help - Print this message.\n"
