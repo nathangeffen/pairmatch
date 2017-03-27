@@ -731,8 +731,7 @@ public:
   }
   ~Simulation()
   {
-    for (auto& agent: agents)
-      delete agent;
+    for (auto& agent: agents) delete agent;
   }
   void simulate()
   {
