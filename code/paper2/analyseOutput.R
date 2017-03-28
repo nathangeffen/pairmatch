@@ -1,4 +1,4 @@
-inp = read.csv("output_20k_3yr_fewsims.csv", FALSE)
+inp = read.csv("output_20k_3yr_smallk.csv", FALSE)
 library(xtable)
 
 # Timings
@@ -83,9 +83,9 @@ format_prevs <- function(prevs) {
                  "Male 35-39", "Female 35-39", "Male 40-44", "Female 40-44",
                  "Male 45-49", "Female 45-49")
   vals = rep(-1, length(categories))
-  tex_col_names = c("RPM 0.001", "RKPM 0.001", "CSPM 0.001",
-                  "RPM 0.01", "RKPM 0.01", "CSPM 0.01",
-                  "RPM 0.1", "RKPM 0.1", "CSPM 0.1")
+  tex_col_names = c("RPM 0.001", "RKPM 0.001", "CSPM 0.001", "BF 0.001", "BLOSSOM 0.001",
+                  "RPM 0.01", "RKPM 0.01", "CSPM 0.01", "BF 0.01", "BLOSSOM 0.01",
+                  "RPM 0.1", "RKPM 0.1", "CSPM 0.1", "BF 0.1", "BLOSSOM 0.1")
   r_col_names = gsub(" ","_", tex_col_names)
   r_col_names = gsub("[.]", "_", r_col_names)
   output_table = data.frame(row.names = categories)

@@ -26,6 +26,7 @@
 #include <sys/time.h>
 
 #include <boost/algorithm/string.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include "CSV_Parser.hh"
 #include "sample.hh"
@@ -42,6 +43,8 @@ thread_local std::mt19937 rng;
 
 #define HEURISTIC_DISTANCE 0
 #define TABLE_DISTANCE 1
+
+#define GRAPH_ACCURACY 10000
 
 #define FEMALE 0
 #define MALE 1
@@ -1174,15 +1177,23 @@ public:
     }
   }
 
-  AgentVector getShuffledUnmatchedAgents()
+  inline AgentVector getUnmatchedAgents()
   {
     AgentVector unmatchedAgents;
     for (auto& agent : agents) {
       if (agent->isMatchable(currentDate))
         unmatchedAgents.push_back(agent);
     }
-    shuffle(unmatchedAgents.begin(), unmatchedAgents.end(), rng);
     unmatchedAgents.shrink_to_fit();
+    return unmatchedAgents;
+  }
+
+  AgentVector getShuffledUnmatchedAgents()
+  {
+    AgentVector unmatchedAgents = getUnmatchedAgents();
+    shuffle(unmatchedAgents.begin(), unmatchedAgents.end(), rng);
+    // Remove back agent if odd
+    if (unmatchedAgents.size() % 2 == 1) unmatchedAgents.pop_back();
     return unmatchedAgents;
   }
 
@@ -1586,6 +1597,70 @@ void clusterShuffleMatchEvent(Simulation* simulation)
 }
 
 
+/******************** Call Blossom V reference algorithm ******************/
+
+void graphPairs(const char *graph,
+                const Simulation* simulation,
+                AgentVector& agents)
+{
+  FILE *f = fopen(graph, "w");
+
+  uint64_t vertices = (uint64_t) agents.size();
+  uint64_t edges = vertices * (vertices - 1) / 2;
+  fprintf(f, "%lu %lu\n", vertices, edges);
+  for (uint64_t i = 0; i < agents.size(); ++i) {
+    for (uint64_t j = i + 1; j < agents.size(); ++j) {
+      double d = simulation->distance(agents[i],agents[j]);
+      fprintf(f, "%lu %lu %.0f\n", i, j, d * GRAPH_ACCURACY);
+    }
+  }
+  fclose(f);
+}
+
+void blossomVMatchEvent(Simulation* simulation)
+{
+  AgentVector agents = simulation->getShuffledUnmatchedAgents();
+
+  if (agents.size() == 0) return;
+
+  std::ostringstream ss;
+  ss << std::this_thread::get_id();
+  std::string suffix = ss.str() + std::string(".txt");
+  std::string graph_file = std::string("bv_graph_") + suffix;
+  std::string blossom_out_file = std::string("bv_out_") + suffix;
+
+  graphPairs(graph_file.c_str(), simulation, agents);
+  std::string command("./blossom5 -e ");
+  command += graph_file;
+  command +=  std::string(" -w ");
+  command += blossom_out_file;
+  command += std::string(" > /dev/null");
+  fflush(stdout);
+  if(system(command.c_str()) != 0) {
+    std::cerr << "Error executing Blossom V." << std::endl;
+    exit(1);
+  }
+
+  FILE *f = fopen(blossom_out_file.c_str(), "r");
+  uint64_t from, to;
+  if (fscanf(f, "%lu %lu\n", &from, &to) != 2) {
+    fprintf(stderr, "Error reading graph file.\n");
+    exit(1);
+  }
+  for (size_t i = 0; i < agents.size() / 2; ++i) {
+    if (fscanf(f, "%lu %lu\n", &from, &to) != 2) {
+      fprintf(stderr, "Error reading graph file.\n");
+      exit(1);
+    }
+    simulation->makePartner(agents[from], agents[to],
+                            simulation->distance(agents[from], agents[to]),
+                            simulation->meanDaysRelationship);
+  }
+  fclose(f);
+}
+
+/*********************************************************************/
+
 void Simulation::setEvents()
 {
   if (parameterMap.at("AGE_EVENT").isSet()) events.push_back(ageEvent);
@@ -1599,14 +1674,13 @@ void Simulation::setEvents()
     events.push_back(randomKMatchEvent);
   } else if (s == "CSPM") {
     events.push_back(clusterShuffleMatchEvent);
+  }  else if (s == "BLOSSOMV") {
+    events.push_back(blossomVMatchEvent);
   } else {
     fprintf(stderr, "Unknown matching algorithm.\n");
     exit(1);
   }
 }
-
-
-
 
 /***************************/
 
