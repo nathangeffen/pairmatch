@@ -761,10 +761,8 @@ public:
       if (a->sex == FEMALE && a->sexual_orientation == HOMOSEXUAL) ++wswcount;
     }
     /*******************/
-    unsigned analyzeAgents = parameterMap.
-      at("ANALYZE_AFTER_INIT").getDbl();
-    if (analyzeAgents)
-      analysis();
+    unsigned analyzeAgents = parameterMap.at("ANALYZE_AFTER_INIT").getDbl();
+    if (analyzeAgents) analysis();
     /* Main loop */
 
     // Make sure main loop uses integer arithmetic, rather than floats
@@ -787,8 +785,7 @@ public:
       }
       if (outputAgents > 0 && (i + 1) % outputFrequency == 0)
         printAgents(agents, simulationNum, currentDate, stdout);
-      if (analyzeAgents > 0 && (i + 1) % analyze_frequency == 0)
-        analysis();
+      if (analyzeAgents > 0 && (i + 1) % analyze_frequency == 0) analysis();
     }
 
     gettimeofday(&timeEnd, NULL);
@@ -798,11 +795,9 @@ public:
 
     /* Wrap up */
     outputAgents = parameterMap.at("OUTPUT_AGENTS_AT_END").getDbl();
-    if (outputAgents)
-      printAgents(agents, simulationNum, endDate, stdout);
+    if (outputAgents) printAgents(agents, simulationNum, endDate, stdout);
     analyzeAgents = parameterMap.at("ANALYZE_AT_END").getDbl();
-    if (analyzeAgents)
-      analysis();
+    if (analyzeAgents) analysis();
   }
   void initializeAgents()
   {
@@ -1451,8 +1446,7 @@ public:
 
 void ageEvent(Simulation* simulation)
 {
-  for (auto& agent : simulation->agents)
-    agent->age += simulation->timeStep;
+  for (auto& agent : simulation->agents) agent->age += simulation->timeStep;
 }
 
 void infectEvent(Simulation* simulation)
@@ -1487,7 +1481,8 @@ void breakupEvent(Simulation* simulation)
       Agent* partner = agent->partner;
       agent->partner = NULL;
       partner->partner = NULL;
-      agent->setSingleLength(simulation->currentDate, simulation->meanDaysSingle);
+      agent->setSingleLength(simulation->currentDate,
+                             simulation->meanDaysSingle);
       partner->setSingleLength(simulation->currentDate,
                                simulation->meanDaysSingle);
       ++breakups;
@@ -1498,6 +1493,10 @@ void breakupEvent(Simulation* simulation)
 
 void randomMatchEvent(Simulation* simulation)
 {
+  struct timeval timeBegin, timeEnd;
+  double elapsedTime;
+  gettimeofday(&timeBegin, NULL);
+
   AgentVector unmatchedAgents = simulation->getShuffledUnmatchedAgents();
 
   if (unmatchedAgents.size() > 0)
@@ -1506,10 +1505,22 @@ void randomMatchEvent(Simulation* simulation)
                               simulation->distance(unmatchedAgents[i],
                                        unmatchedAgents[i + 1]),
                               simulation->meanDaysRelationship);
+
+  gettimeofday(&timeEnd, NULL);
+  elapsedTime = timeEnd.tv_sec - timeBegin.tv_sec;
+  printf("%s,PM_TIMING,RPM,%u,%f\n", simulation->simulationName.c_str(),
+           simulation->simulationNum, elapsedTime);
+  printf("%s,PM_SIZE,RPM,%u,%lu\n", simulation->simulationName.c_str(),
+         simulation->simulationNum, unmatchedAgents.size());
 }
 
 void randomKMatchEvent(Simulation *simulation)
 {
+  struct timeval timeBegin, timeEnd;
+  double elapsedTime;
+  gettimeofday(&timeBegin, NULL);
+
+
   std::uniform_real_distribution<double> uni;
   AgentVector unmatchedAgents = simulation->getShuffledUnmatchedAgents();
 
@@ -1527,10 +1538,21 @@ void randomKMatchEvent(Simulation *simulation)
       }
     }
   }
+
+  gettimeofday(&timeEnd, NULL);
+  elapsedTime = timeEnd.tv_sec - timeBegin.tv_sec;
+  printf("%s,PM_TIMING,RKPM,%u,%f\n", simulation->simulationName.c_str(),
+           simulation->simulationNum, elapsedTime);
+  printf("%s,PM_SIZE,RKPM,%u,%lu\n", simulation->simulationName.c_str(),
+         simulation->simulationNum, unmatchedAgents.size());
 }
 
 void clusterShuffleMatchEvent(Simulation* simulation)
 {
+  struct timeval timeBegin, timeEnd;
+  double elapsedTime;
+  gettimeofday(&timeBegin, NULL);
+
   AgentVector unmatchedAgents = simulation->getShuffledUnmatchedAgents();
   uint64_t cluster_size = unmatchedAgents.size() / simulation->clusters;
   for (auto& a : unmatchedAgents) a->weight = simulation->clusterValue(a);
@@ -1555,6 +1577,12 @@ void clusterShuffleMatchEvent(Simulation* simulation)
       }
     }
   }
+  gettimeofday(&timeEnd, NULL);
+  elapsedTime = timeEnd.tv_sec - timeBegin.tv_sec;
+  printf("%s,PM_TIMING,CSPM,%u,%f\n", simulation->simulationName.c_str(),
+           simulation->simulationNum, elapsedTime);
+  printf("%s,PM_SIZE,CSPM,%u,%lu\n", simulation->simulationName.c_str(),
+         simulation->simulationNum, unmatchedAgents.size());
 }
 
 
@@ -1737,9 +1765,6 @@ void callSimulation(ParameterMap& parameterMap, const unsigned simulationNum)
 
 int main(int argc, char *argv[])
 {
-  std::cout << "Agent: " << sizeof(Agent) << std::endl;
-  std::cout << "Simulation: " << sizeof(Simulation) << std::endl;
-  std::cout << "Partnership: " << sizeof(Partnerships) << std::endl;
   if (cmdOptionExists(argv, argv + argc, "-h")) {
     printf("%s options, where options are:\n"
            "-h: help - Print this message.\n"
