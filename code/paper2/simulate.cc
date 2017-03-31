@@ -454,6 +454,11 @@ void setDefaultParameters(ParameterMap& parameterMap)
   addParameter(parameterMap, "DISTANCE_METHOD",
                "Distance calculation to use (HEURISTIC,TABLE)", "HEURISTIC");
 
+  addParameter(parameterMap, "PARTNERS_LOAD_FACTOR",
+               "Load factor for partnerships unordered set (advanced)", {0});
+  addParameter(parameterMap, "PARTNERS_RESERVE",
+               "Capacity for partnerships unordered set (advanced)", {0});
+
   addParameter(parameterMap, "RANDOM_SEED", "Value to set random seed to",
                {1});
 }
@@ -640,7 +645,7 @@ public:
     return partnerships.size();
   }
 
-private:
+  //private:
   uint64_t combine(uint32_t id1, uint32_t id2) const
   {
     uint64_t A = id1 < id2 ? id1 : id2;
@@ -732,9 +737,13 @@ public:
       exit(1);
     }
 
+    size_t max_p = (size_t) parameterMap.at("PARTNERS_RESERVE").getDbl();
+    if (max_p > 0) partnerships.partnerships.reserve(max_p);
+    auto lf = parameterMap.at("PARTNERS_LOAD_FACTOR").getDbl();
+    if (lf > 0) partnerships.partnerships.max_load_factor(lf);
+
     unsigned seed = parameterMap.at("RANDOM_SEED").getDbl();
-    if (seed)
-      rng.seed(seed * simulation_num);
+    if (seed) rng.seed(seed * simulation_num);
   }
   ~Simulation()
   {
@@ -1177,24 +1186,23 @@ public:
     }
   }
 
-  inline AgentVector getUnmatchedAgents()
+  AgentVector getUnmatchedAgents()
   {
-    AgentVector unmatchedAgents;
+    AgentVector matingPool;
     for (auto& agent : agents) {
       if (agent->isMatchable(currentDate))
-        unmatchedAgents.push_back(agent);
+        matingPool.push_back(agent);
     }
-    unmatchedAgents.shrink_to_fit();
-    return unmatchedAgents;
+    return matingPool;
   }
 
   AgentVector getShuffledUnmatchedAgents()
   {
-    AgentVector unmatchedAgents = getUnmatchedAgents();
-    shuffle(unmatchedAgents.begin(), unmatchedAgents.end(), rng);
+    AgentVector matingPool = getUnmatchedAgents();
+    shuffle(matingPool.begin(), matingPool.end(), rng);
     // Remove back agent if odd
-    if (unmatchedAgents.size() % 2 == 1) unmatchedAgents.pop_back();
-    return unmatchedAgents;
+    if (matingPool.size() % 2 == 1) matingPool.pop_back();
+    return matingPool;
   }
 
   PartnershipScore
@@ -1504,9 +1512,9 @@ void breakupEvent(Simulation* simulation)
 
 void randomMatchEvent(Simulation* simulation)
 {
-  struct timeval timeBegin, timeEnd;
-  double elapsedTime;
-  gettimeofday(&timeBegin, NULL);
+  // struct timeval timeBegin, timeEnd;
+  // double elapsedTime;
+  // gettimeofday(&timeBegin, NULL);
 
   AgentVector unmatchedAgents = simulation->getShuffledUnmatchedAgents();
 
@@ -1517,19 +1525,19 @@ void randomMatchEvent(Simulation* simulation)
                                        unmatchedAgents[i + 1]),
                               simulation->meanDaysRelationship);
 
-  gettimeofday(&timeEnd, NULL);
-  elapsedTime = timeEnd.tv_sec - timeBegin.tv_sec;
-  printf("%s,PM_TIMING,RPM,%u,%f\n", simulation->simulationName.c_str(),
-           simulation->simulationNum, elapsedTime);
-  printf("%s,PM_SIZE,RPM,%u,%lu\n", simulation->simulationName.c_str(),
-         simulation->simulationNum, unmatchedAgents.size());
+  // gettimeofday(&timeEnd, NULL);
+  // elapsedTime = timeEnd.tv_sec - timeBegin.tv_sec;
+  // printf("%s,PM_TIMING,RPM,%u,%f\n", simulation->simulationName.c_str(),
+  //          simulation->simulationNum, elapsedTime);
+  // printf("%s,PM_SIZE,RPM,%u,%lu\n", simulation->simulationName.c_str(),
+  //        simulation->simulationNum, unmatchedAgents.size());
 }
 
 void randomKMatchEvent(Simulation *simulation)
 {
-  struct timeval timeBegin, timeEnd;
-  double elapsedTime;
-  gettimeofday(&timeBegin, NULL);
+  // struct timeval timeBegin, timeEnd;
+  // double elapsedTime;
+  // gettimeofday(&timeBegin, NULL);
 
 
   std::uniform_real_distribution<double> uni;
@@ -1550,19 +1558,19 @@ void randomKMatchEvent(Simulation *simulation)
     }
   }
 
-  gettimeofday(&timeEnd, NULL);
-  elapsedTime = timeEnd.tv_sec - timeBegin.tv_sec;
-  printf("%s,PM_TIMING,RKPM,%u,%f\n", simulation->simulationName.c_str(),
-           simulation->simulationNum, elapsedTime);
-  printf("%s,PM_SIZE,RKPM,%u,%lu\n", simulation->simulationName.c_str(),
-         simulation->simulationNum, unmatchedAgents.size());
+  // gettimeofday(&timeEnd, NULL);
+  // elapsedTime = timeEnd.tv_sec - timeBegin.tv_sec;
+  // printf("%s,PM_TIMING,RKPM,%u,%f\n", simulation->simulationName.c_str(),
+  //          simulation->simulationNum, elapsedTime);
+  // printf("%s,PM_SIZE,RKPM,%u,%lu\n", simulation->simulationName.c_str(),
+  //        simulation->simulationNum, unmatchedAgents.size());
 }
 
 void clusterShuffleMatchEvent(Simulation* simulation)
 {
-  struct timeval timeBegin, timeEnd;
-  double elapsedTime;
-  gettimeofday(&timeBegin, NULL);
+  // struct timeval timeBegin, timeEnd;
+  // double elapsedTime;
+  // gettimeofday(&timeBegin, NULL);
 
   AgentVector unmatchedAgents = simulation->getShuffledUnmatchedAgents();
   uint64_t cluster_size = unmatchedAgents.size() / simulation->clusters;
@@ -1588,12 +1596,20 @@ void clusterShuffleMatchEvent(Simulation* simulation)
       }
     }
   }
-  gettimeofday(&timeEnd, NULL);
-  elapsedTime = timeEnd.tv_sec - timeBegin.tv_sec;
-  printf("%s,PM_TIMING,CSPM,%u,%f\n", simulation->simulationName.c_str(),
-           simulation->simulationNum, elapsedTime);
-  printf("%s,PM_SIZE,CSPM,%u,%lu\n", simulation->simulationName.c_str(),
-         simulation->simulationNum, unmatchedAgents.size());
+  // gettimeofday(&timeEnd, NULL);
+  // elapsedTime = timeEnd.tv_sec - timeBegin.tv_sec;
+  // printf("%s,PM_TIMING,CSPM,%u,%f\n", simulation->simulationName.c_str(),
+  //          simulation->simulationNum, elapsedTime);
+  // printf("%s,PM_SIZE,CSPM,%u,%lu-%lu\n", simulation->simulationName.c_str(),
+  //        simulation->simulationNum, unmatchedAgents.size(),
+  //        unmatchedAgents.capacity());
+  // auto &p = simulation->partnerships.partnerships;
+  // printf("%s,PM_SET,CSPM,%u,%.2f-%.2f-%lu-%lu\n",
+  //        simulation->simulationName.c_str(),
+  //        simulation->simulationNum,
+  //        p.load_factor(), p.max_load_factor(),
+  //        p.bucket_count(), p.max_bucket_count());
+
 }
 
 
