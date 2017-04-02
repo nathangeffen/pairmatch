@@ -24,3 +24,7 @@ positions.ods
 simulate
 #*
 *.ods
+*.xls
+*.xlsx
+gsl_test
+

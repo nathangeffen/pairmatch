@@ -6,7 +6,9 @@
 #include <vector>
 #include <boost/algorithm/string.hpp>
 
+extern "C" {
 #include "csvparser.h"
+}
 
 typedef std::vector< std::vector<double > > DblMatrix;
 

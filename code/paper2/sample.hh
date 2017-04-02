@@ -1,7 +1,9 @@
 #include <iostream>
 #include <random>
 #include <vector>
+extern "C" {
 #include "ransampl.h"
+}
 
 using namespace std;
 

@@ -33,9 +33,11 @@
 
 thread_local std::mt19937 rng;
 
-#define DAY 1.0 / 365;
+#define DAY 1.0 / 365
 #define MIN_AGE 12
 #define MAX_AGE 100
+
+#define MAX_AGE_WEIBULL 27
 
 #define RPM 1
 #define RKPM 2
@@ -346,13 +348,32 @@ void setDefaultParameters(ParameterMap& parameterMap)
   addParameter(parameterMap, "END_DATE",
                "End date of simulation", {2018.0});
   addParameter(parameterMap, "TIME_STEP",
-               "Time step for each iteration of simulation", {1.0 / 365.0});
+               "Time step for each iteration of simulation", {DAY});
   addParameter(parameterMap, "PREV_PARTNER_PENALTY",
                "Previous partner penalty in pair matching", {10.0});
-  addParameter(parameterMap, "MEAN_DAYS_RELATIONSHIP",
-               "Mean number of days agents are partners", {365.0});
-  addParameter(parameterMap, "MEAN_DAYS_SINGLE",
-               "Mean number of days agents are single", {365.0});
+
+  addParameter(parameterMap, "MEAN_RELATIONSHIP_LENGTH_DEVIATION",
+               "Mean difference from expected relationship length.", {0});
+  addParameter(parameterMap, "SD_RELATIONSHIP_LENGTH_DEVIATION",
+               "Standard deviation of relationship lengths.", {3.0});
+
+  addParameter(parameterMap, "SHAPE_REL_CSV",
+               "File of shapes for partnership", "data/Rel_shape.csv");
+
+  addParameter(parameterMap, "SCALE_REL_CSV",
+               "File of scales for partnership", "data/Rel_scale.csv");
+
+
+  addParameter(parameterMap, "SHAPE_SINGLE",
+               "Shape for Weibull distribution of time spent single", {0.4});
+  addParameter(parameterMap, "SCALE_SINGLE",
+               "Scale for Weibull distribution of time spent single", {100.0});
+
+
+  //addParameter(parameterMap, "MEAN_DAYS_RELATIONSHIP",
+  //             "Mean number of days agents are partners", {365.0});
+  //addParameter(parameterMap, "MEAN_DAYS_SINGLE",
+  //             "Mean number of days agents are single", {7.0});
 
   addParameter(parameterMap, "HET_MALE_INFECTIVITY",
                "Daily risk of getting infected for male in heterosexual sex",
@@ -505,16 +526,16 @@ public:
   Agent* partner;
   Agent* infector = NULL;
 
-  float het_infectivity;
-  float het_infectiousness;
-  float hom_infectivity;
-  float hom_infectiousness;
-  float age;
-  float desired_age;
-  float relationship_change_date;
-  float binomial_p_relationship_length;
-  float binomial_p_relationship_wait;
-  float weight;
+  double mu_relationship_length;
+  double mu_single_length;
+  double relationship_change_date;
+  double age;
+  double desired_age;
+  double het_infectivity;
+  double het_infectiousness;
+  double hom_infectivity;
+  double hom_infectiousness;
+  double weight; // Used by some pair-matching algorithms
 
   unsigned short sex;
   unsigned short sexual_orientation;
@@ -526,30 +547,52 @@ public:
 
 
   void setRelationshipLength(const double current_date,
-                             const double mean_days_relationship)
+                             const DblMatrix& shapeRelationshipLength,
+                             const DblMatrix& scaleRelationshipLength)
   {
-    /* This needs to be replaced with Stefan's relationship status equations. */
-    double p = (binomial_p_relationship_length +
-                partner->binomial_p_relationship_length) / 2.0;
-    std::binomial_distribution<int> dist (mean_days_relationship, p);
-    double num_days = (double) dist(rng) * DAY;
-    /****************************************/
-    relationship_change_date = current_date + num_days;
+    double shape, scale;
+    size_t index1, index2;
+
+    if (sex == MALE) {
+      index1 = std::min( (unsigned) age - MIN_AGE, (unsigned) MAX_AGE_WEIBULL);
+      index2 = std::min( (unsigned) partner->age - MIN_AGE,
+                         (unsigned) MAX_AGE_WEIBULL);
+    } else {
+      index2 = std::min( (unsigned) age - MIN_AGE, (unsigned) MAX_AGE_WEIBULL);
+      index1 = std::min( (unsigned) partner->age - MIN_AGE,
+                         (unsigned) MAX_AGE_WEIBULL);
+    }
+
+    shape = shapeRelationshipLength[ index1 ] [ index2 ];
+    // scale = scaleRelationshipLength[ index1 ] [index2];
+    // THIS IS WRONG BUT TESTING
+    scale = scaleRelationshipLength[ index1 ] [index2] / 3.0;
+
+
+    //mu += (relationship_length_factor +
+    //       partner->relationship_length_factor) / 2.0;
+    std::weibull_distribution<double> dist(shape, scale);
+    double relationshipLength = dist(rng);
+    relationship_change_date = current_date + relationshipLength;
     partner->relationship_change_date = relationship_change_date;
+    printf("D0,%.3f,%.3f\n", current_date, relationship_change_date);
   }
+
   void setSingleLength(double current_date,
-                       double mean_days_single)
+                       double shape, double scale)
   {
-    /* This needs to be replaced with Stefan's relationship status equations. */
-    std::binomial_distribution<int> dist (mean_days_single,
-                                          binomial_p_relationship_wait);
+    // std::binomial_distribution<int> dist (mean_days_single,
+    //                                       binomial_p_relationship_wait);
+    std::weibull_distribution<double> dist(shape, scale);
+    // THIS ISN'T GOOD ENOUGH BUT IT'S A FILLER UNTIL WE'VE FIGURED IT OUT
+    // std::uniform_real_distribution<double> dist(0, 730.0);
     /****************************************/
     relationship_change_date = current_date + (double) dist(rng) * DAY;
   }
 
   bool isMatchable(const double current_date) const
   {
-    if (partner == NULL && current_date >= relationship_change_date)
+    if (partner == NULL && (current_date + DAY / 2.0) >= relationship_change_date)
       return true;
     else
       return false;
@@ -560,15 +603,13 @@ public:
     fprintf(f, "ID,%7u,Age,%3.2f,Sex,%c,Orientation,%c,Desired,%.0f",
             id, age, (sex == MALE ? 'M' : 'F'),
             (sexual_orientation == HETEROSEXUAL ? 'S' : 'G'), desired_age);
-    fprintf(f, ",Risk,%.3f,%.3f,Partner",
-            binomial_p_relationship_length,binomial_p_relationship_wait);
+    //fprintf(f, ",Risk,%.3f,%.3f,Partner",
+    //        relationship_length_factor, binomial_p_relationship_wait);
     if (partner)
       fprintf(f,",%7u", partner->id);
     else
       fprintf(f, ",      0");
-    fprintf(f, ",Date,%.3f,Infection,%d,%.3f,%.3f,%.3f\n",
-            relationship_change_date, infected, het_infectiousness,
-            hom_infectivity, hom_infectiousness);
+    fprintf(f, ",Date,%.3f,Infection,%d\n", relationship_change_date, infected);
   }
 };
 
@@ -582,13 +623,13 @@ ostream& operator<<(ostream& os, const Agent& agent)
      << ",Orientation," << (agent.sexual_orientation == HETEROSEXUAL
                             ? "S" : "G")
      << ",Desired," << agent.desired_age;
-  std::ios_base::fmtflags oldflags = os.flags();
-  std::streamsize oldprecision = os.precision();
-  os << std::fixed << std::setprecision(3)
-     << ",Risk," << agent.binomial_p_relationship_length
-     << "," << agent.binomial_p_relationship_wait;
-  os.flags (oldflags);
-  os.precision (oldprecision);
+  // std::ios_base::fmtflags oldflags = os.flags();
+  // std::streamsize oldprecision = os.precision();
+  // os << std::fixed << std::setprecision(3)
+  //    << ",Risk," << agent.relationship_length_factor
+  //    << "," << agent.binomial_p_relationship_wait;
+  // os.flags (oldflags);
+  // os.precision (oldprecision);
   if (agent.partner) {
     auto &p = agent.partner;
     os << ",ID," << p->id << ",Age," << p->age
@@ -598,10 +639,6 @@ ostream& operator<<(ostream& os, const Agent& agent)
        << ",Desired," << p->desired_age;
   }
   os << ",Date," << agent.relationship_change_date;
-  os << ",Infection," << agent.het_infectivity << ","
-     << agent.het_infectiousness << ","
-     << agent.hom_infectivity << ","
-     << agent.hom_infectiousness;
   return os;
 }
 
@@ -719,14 +756,15 @@ public:
     startDate = parameterMap.at("START_DATE").getDbl();
     endDate = parameterMap.at("END_DATE").getDbl();
     timeStep = parameterMap.at("TIME_STEP").getDbl();
-    meanDaysRelationship = parameterMap.at("MEAN_DAYS_RELATIONSHIP").getDbl();
-    meanDaysSingle = parameterMap.at("MEAN_DAYS_SINGLE").getDbl();
     currentDate = startDate;
     ageInterval = parameterMap.at("ANALYSIS_AGE_INTERVAL").getDbl();
     neighbors = parameterMap.at("MATCH_NEIGHBORS").getDbl();
     clusters = parameterMap.at("MATCH_CLUSTERS").getDbl();
     failureThresholdScore = parameterMap.at("MATCH_SCORE_FAIL").getDbl();
     poorThresholdScore = parameterMap.at("MATCH_SCORE_POOR").getDbl();
+    shapeSingle = parameterMap.at("SHAPE_SINGLE").getDbl();
+    scaleSingle = parameterMap.at("SCALE_SINGLE").getDbl();
+
     string s = parameterMap.at("DISTANCE_METHOD").getStr();
     if (s == "HEURISTIC")
       distanceMethod = HEURISTIC_DISTANCE;
@@ -786,6 +824,16 @@ public:
     analyzeAgents = parameterMap.at("ANALYZE_DURING_SIM").getDbl(0);
     unsigned analyze_frequency =
       parameterMap.at("ANALYZE_DURING_SIM").getDbl(1);
+
+    //// Debug
+    // std::cout << "D1," << agents.size() << std::endl;
+    // for (auto &a:agents) {
+    //   std::cout << "D0," << simulationName << ","
+    //             << a->relationship_change_date
+    //             << "," << a->partner << std::endl;
+    // }
+    /////
+
     for (unsigned i = 0; i < num_iterations; ++i, currentDate += timeStep) {
       for (auto& e: events) e(this);
 
@@ -933,6 +981,8 @@ public:
 
   inline void initAgent(Agent *agent,
                         const unsigned id,
+                        float mean_relationship_length_deviation,
+                        float sd_relationship_length_deviation,
                         Sample& sampleAgeshare,
                         const std::vector<double>& femRatio,
                         const std::vector<double>& wswRate,
@@ -947,6 +997,8 @@ public:
                         std::vector<Sample>& sample_matMM)
   {
     std::uniform_real_distribution<double> uni;
+    std::normal_distribution<double> norm(mean_relationship_length_deviation,
+                                          sd_relationship_length_deviation);
 
     agent->id = id;
     // Age
@@ -978,20 +1030,22 @@ public:
     else
       agent->desired_age = sample_matMM[age - 12]() + 12;
 
-    agent->binomial_p_relationship_length = uni(rng);
-    agent->binomial_p_relationship_wait = uni(rng);
-    if (agent->binomial_p_relationship_length >= 0.5 &&
-        agent->binomial_p_relationship_wait >= 0.5) {
-      ++numLongBreakLongPartnership;
-    } else if (agent->binomial_p_relationship_length >= 0.5 &&
-               agent->binomial_p_relationship_wait < 0.5) {
-      ++numShortBreakLongPartnership;
-    } else if (agent->binomial_p_relationship_length < 0.5 &&
-               agent->binomial_p_relationship_wait >= 0.5) {
-      ++numLongBreakShortPartnership;
-    } else {
-      ++numShortBreakShortPartnership;
-    }
+    // agent->relationship_length_factor = 0; // norm(rng);
+
+    // agent->binomial_p_relationship_wait = uni(rng);
+    // if (agent->relationship_length_factor >= 0 &&
+    //    agent->binomial_p_relationship_wait >= 0.5) {
+    //  ++numLongBreakLongPartnership;
+    // } else if (agent->relationship_length_factor >= 0 &&
+    //           agent->binomial_p_relationship_wait < 0.5) {
+    //  ++numShortBreakLongPartnership;
+    // } else if (agent->relationship_length_factor < 0 &&
+    //           agent->binomial_p_relationship_wait >= 0.5) {
+    //  ++numLongBreakShortPartnership;
+    // } else {
+    //  ++numShortBreakShortPartnership;
+    // }
+
   }
 
   void createPartners(AgentVector& agents,
@@ -1031,6 +1085,10 @@ public:
       parameterMap.at("HOM_FEMALE_INFECTIVITY").getDbl();
     double hom_female_infectiousness =
       parameterMap.at("HOM_FEMALE_INFECTIOUSNESS").getDbl();
+    double mean_relationship_length_deviation =
+      parameterMap.at("MEAN_RELATIONSHIP_LENGTH_DEVIATION").getDbl();
+    double sd_relationship_length_deviation =
+      parameterMap.at("SD_RELATIONSHIP_LENGTH_DEVIATION").getDbl();
     Sample sample_ageshare(ageShare, &rng);
     vector<Sample> sample_matWW(matWW[0].size());
     vector<Sample> sample_matMW(matMW[0].size());
@@ -1050,6 +1108,8 @@ public:
     for (unsigned i = fromAgent; (i + increment - 1) < toAgent; i += increment) {
       Agent *agent = new Agent();
       initAgent(agent, i + 1,
+                mean_relationship_length_deviation,
+                sd_relationship_length_deviation,
                 sample_ageshare,
                 femRatio,
                 wswRate,
@@ -1076,6 +1136,8 @@ public:
         agent->initial_relationship = true;
         Agent* partner = new Agent();
         initAgent(partner, i + 2,
+                  mean_relationship_length_deviation,
+                  sd_relationship_length_deviation,
                   sample_ageshare,
                   femRatio,
                   wswRate,
@@ -1117,22 +1179,26 @@ public:
                                     hom_female_infectivity,
                                     hom_male_infectiousness,
                                     hom_female_infectiousness);
-        makePartner(agent, partner, distance(agent, partner),
-                    meanDaysRelationship);
+        makePartner(agent, partner, distance(agent, partner));
         // Correct relationship time because this is in the middle of relationship
-        std::uniform_real_distribution<double>
-          uni2(currentDate, agent->relationship_change_date);
-        agent->relationship_change_date = uni2(rng);
-        partner->relationship_change_date = agent->relationship_change_date;
+        //std::uniform_real_distribution<double>
+        //  uni2(currentDate, agent->relationship_change_date);
+        //agent->relationship_change_date = uni2(rng);
+        //partner->relationship_change_date = agent->relationship_change_date;
       } else {
-        agent->setSingleLength(currentDate, meanDaysSingle);
-        // Correct single time because this is in the middle of relationship
-        std::uniform_real_distribution<double>
-          uni2(currentDate, agent->relationship_change_date);
-        agent->relationship_change_date = uni2(rng);
-        agent->partner = NULL;
-      }
+        // Best so far in order
+        agent->setSingleLength(currentDate, 0.85, 1200.0);
+        // agent->setSingleLength(currentDate, 0.7, 1500.0);
+        // agent->setSingleLength(currentDate, 0.7, 1400.0);
+        // agent->setSingleLength(currentDate, 0.8, 1400.0);
+        // agent->setSingleLength(currentDate, 0.8, 1500.0);
 
+        // Correct single time because this is in the middle of relationship
+        //std::uniform_real_distribution<double>
+        //  uni2(currentDate, agent->relationship_change_date);
+        //agent->relationship_change_date = uni2(rng);
+        //agent->partner = NULL;
+      }
       agents.push_back(agent);
       if (agent->partner)
         agents.push_back(agent->partner);
@@ -1150,6 +1216,12 @@ public:
                            c_str(), ",", true).convert_all_entries_to_doubles();
     wsmAgeDist = CSVParser(parameterMap.at("WSM_AGE_DIST_CSV").stringValue.
                            c_str(), ",", true).convert_all_entries_to_doubles();
+    shapeRelationshipLength =
+      CSVParser(parameterMap.at("SHAPE_REL_CSV").stringValue.
+                c_str(), ",", true).convert_all_entries_to_doubles();
+    scaleRelationshipLength =
+      CSVParser(parameterMap.at("SCALE_REL_CSV").stringValue.
+                c_str(), ",", true).convert_all_entries_to_doubles();
     setEvents();
   }
 
@@ -1172,18 +1244,18 @@ public:
         ++numInfectedWsw;
     }
 
-    if (agent->binomial_p_relationship_length >= 0.5 &&
-        agent->binomial_p_relationship_wait >= 0.5) {
-      ++numInfectedLongBreakLongPartnership;
-    } else if (agent->binomial_p_relationship_length >= 0.5 &&
-               agent->binomial_p_relationship_wait < 0.5) {
-      ++numInfectedShortBreakLongPartnership;
-    } else if (agent->binomial_p_relationship_length < 0.5 &&
-               agent->binomial_p_relationship_wait >= 0.5) {
-      ++numInfectedLongBreakShortPartnership;
-    } else {
-      ++numInfectedShortBreakShortPartnership;
-    }
+    // if (agent->relationship_length_factor >= 0 &&
+    //     agent->binomial_p_relationship_wait >= 0.5) {
+    //   ++numInfectedLongBreakLongPartnership;
+    // } else if (agent->relationship_length_factor >= 0.5 &&
+    //            agent->binomial_p_relationship_wait < 0.5) {
+    //   ++numInfectedShortBreakLongPartnership;
+    // } else if (agent->relationship_length_factor < 0 &&
+    //            agent->binomial_p_relationship_wait >= 0.5) {
+    //   ++numInfectedLongBreakShortPartnership;
+    // } else {
+    //   ++numInfectedShortBreakShortPartnership;
+    // }
   }
 
   AgentVector getUnmatchedAgents()
@@ -1256,26 +1328,26 @@ public:
            simulationName.c_str(), simulationNum, currentDate,
            totalWswPartnerships);
 
-    double rateShortBreakShortPartnership = (double)
-      numInfectedShortBreakShortPartnership / numShortBreakShortPartnership;
-    double rateShortBreakLongPartnership = (double)
-      numInfectedShortBreakLongPartnership /  numShortBreakLongPartnership;
-    double rateLongBreakShortPartnership = (double)
-      numInfectedLongBreakShortPartnership / numLongBreakShortPartnership;
-    double rateLongBreakLongPartnership = (double)
-      numInfectedLongBreakLongPartnership / numLongBreakLongPartnership;
-    printf("%s,ANALYSIS,SHORTBREAK_SHORTPARTNERSHIP,%d,%.3f,%.3f\n",
-           simulationName.c_str(), simulationNum, currentDate,
-           rateShortBreakShortPartnership);
-    printf("%s,ANALYSIS,SHORTBREAK_LONGPARTNERSHIP,%d,%.3f,%.3f\n",
-           simulationName.c_str(), simulationNum, currentDate,
-           rateShortBreakLongPartnership);
-    printf("%s,ANALYSIS,LONGBREAK_SHORTPARTNERSHIP,%d,%.3f,%.3f\n",
-           simulationName.c_str(), simulationNum, currentDate,
-           rateLongBreakShortPartnership);
-    printf("%s,ANALYSIS,LONGBREAK_LONGPARTNERSHIP,%d,%.3f,%.3f\n",
-           simulationName.c_str(), simulationNum, currentDate,
-           rateLongBreakLongPartnership);
+    // double rateShortBreakShortPartnership = (double)
+    //   numInfectedShortBreakShortPartnership / numShortBreakShortPartnership;
+    // double rateShortBreakLongPartnership = (double)
+    //   numInfectedShortBreakLongPartnership /  numShortBreakLongPartnership;
+    // double rateLongBreakShortPartnership = (double)
+    //   numInfectedLongBreakShortPartnership / numLongBreakShortPartnership;
+    // double rateLongBreakLongPartnership = (double)
+    //   numInfectedLongBreakLongPartnership / numLongBreakLongPartnership;
+    // printf("%s,ANALYSIS,SHORTBREAK_SHORTPARTNERSHIP,%d,%.3f,%.3f\n",
+    //        simulationName.c_str(), simulationNum, currentDate,
+    //        rateShortBreakShortPartnership);
+    // printf("%s,ANALYSIS,SHORTBREAK_LONGPARTNERSHIP,%d,%.3f,%.3f\n",
+    //        simulationName.c_str(), simulationNum, currentDate,
+    //        rateShortBreakLongPartnership);
+    // printf("%s,ANALYSIS,LONGBREAK_SHORTPARTNERSHIP,%d,%.3f,%.3f\n",
+    //        simulationName.c_str(), simulationNum, currentDate,
+    //        rateLongBreakShortPartnership);
+    // printf("%s,ANALYSIS,LONGBREAK_LONGPARTNERSHIP,%d,%.3f,%.3f\n",
+    //        simulationName.c_str(), simulationNum, currentDate,
+    //        rateLongBreakLongPartnership);
 
     for (unsigned i = 0; i < malesByAge.size(); ++i) {
       ostringstream ssmale, ssfemale;
@@ -1309,8 +1381,7 @@ public:
 
 
   void makePartner(Agent* a, Agent *b,
-                   const double score,
-                   const double mean_days_relationship)
+                   const double score)
   {
     assert(a->partner == NULL);
     assert(b->partner == NULL);
@@ -1321,7 +1392,8 @@ public:
       partnerships.insert(a->id, b->id);
       a->partner = b;
       b->partner = a;
-      a->setRelationshipLength(currentDate, mean_days_relationship);
+      a->setRelationshipLength(currentDate, shapeRelationshipLength,
+                               scaleRelationshipLength);
       ++a->num_partners;
       ++b->num_partners;
       ++totalPartnerships;
@@ -1416,8 +1488,8 @@ public:
   double startDate;
   double endDate;
   double timeStep;
-  double meanDaysRelationship;
-  double meanDaysSingle;
+  double shapeSingle;
+  double scaleSingle;
   double currentDate;
   double failureThresholdScore;
   double poorThresholdScore;
@@ -1455,6 +1527,9 @@ public:
   std::vector<unsigned> femalesByAge;
   std::vector<unsigned> infectedMalesByAge;
   std::vector<unsigned> infectedFemalesByAge;
+
+  DblMatrix shapeRelationshipLength;
+  DblMatrix scaleRelationshipLength;
   DblMatrix mswAgeDist;
   DblMatrix wsmAgeDist;
   DblMatrix msmAgeDist;
@@ -1495,18 +1570,21 @@ void breakupEvent(Simulation* simulation)
 {
   unsigned breakups = 0;
   for (auto& agent: simulation->agents) {
-    if (agent->partner && simulation->currentDate >
-        agent->relationship_change_date) {
+    if (agent->partner &&
+        (simulation->currentDate >= agent->relationship_change_date) ) {
       Agent* partner = agent->partner;
       agent->partner = NULL;
       partner->partner = NULL;
       agent->setSingleLength(simulation->currentDate,
-                             simulation->meanDaysSingle);
+                             simulation->shapeSingle, simulation->scaleSingle);
       partner->setSingleLength(simulation->currentDate,
-                               simulation->meanDaysSingle);
+                               simulation->shapeSingle, simulation->scaleSingle);
       ++breakups;
     }
   }
+  printf("%s,BREAKUP,CSPM,%u,%.3f,%u\n", simulation->simulationName.c_str(),
+         simulation->simulationNum, simulation->currentDate,
+         breakups);
   simulation->totalBreakups += breakups;
 }
 
@@ -1522,15 +1600,14 @@ void randomMatchEvent(Simulation* simulation)
     for (size_t i = 0; i < unmatchedAgents.size()  - 1; i += 2)
       simulation->makePartner(unmatchedAgents[i], unmatchedAgents[i + 1],
                               simulation->distance(unmatchedAgents[i],
-                                       unmatchedAgents[i + 1]),
-                              simulation->meanDaysRelationship);
+                                                   unmatchedAgents[i + 1]));
 
   // gettimeofday(&timeEnd, NULL);
   // elapsedTime = timeEnd.tv_sec - timeBegin.tv_sec;
   // printf("%s,PM_TIMING,RPM,%u,%f\n", simulation->simulationName.c_str(),
   //          simulation->simulationNum, elapsedTime);
-  // printf("%s,PM_SIZE,RPM,%u,%lu\n", simulation->simulationName.c_str(),
-  //        simulation->simulationNum, unmatchedAgents.size());
+  //printf("%s,PM_SIZE,RPM,%u,%lu\n", simulation->simulationName.c_str(),
+  //       simulation->simulationNum, unmatchedAgents.size());
 }
 
 void randomKMatchEvent(Simulation *simulation)
@@ -1552,8 +1629,7 @@ void randomKMatchEvent(Simulation *simulation)
         auto partnershipScore = simulation->closestPairMatchN(it, last);
         if (partnershipScore.partner != last)
           simulation->makePartner(*it, *partnershipScore.partner,
-                                  partnershipScore.score,
-                                  simulation->meanDaysRelationship);
+                                  partnershipScore.score);
       }
     }
   }
@@ -1592,7 +1668,7 @@ void clusterShuffleMatchEvent(Simulation* simulation)
         auto partnershipScore = simulation->closestPairMatchN(it, last);
         if (partnershipScore.partner != last)
           simulation->makePartner(*it, *partnershipScore.partner,
-                      partnershipScore.score, simulation->meanDaysRelationship);
+                                  partnershipScore.score);
       }
     }
   }
@@ -1600,9 +1676,9 @@ void clusterShuffleMatchEvent(Simulation* simulation)
   // elapsedTime = timeEnd.tv_sec - timeBegin.tv_sec;
   // printf("%s,PM_TIMING,CSPM,%u,%f\n", simulation->simulationName.c_str(),
   //          simulation->simulationNum, elapsedTime);
-  // printf("%s,PM_SIZE,CSPM,%u,%lu-%lu\n", simulation->simulationName.c_str(),
-  //        simulation->simulationNum, unmatchedAgents.size(),
-  //        unmatchedAgents.capacity());
+  printf("%s,PM_SIZE,CSPM,%u,%.3f,%lu\n", simulation->simulationName.c_str(),
+         simulation->simulationNum, simulation->currentDate,
+         unmatchedAgents.size());
   // auto &p = simulation->partnerships.partnerships;
   // printf("%s,PM_SET,CSPM,%u,%.2f-%.2f-%lu-%lu\n",
   //        simulation->simulationName.c_str(),
@@ -1669,8 +1745,7 @@ void blossomVMatchEvent(Simulation* simulation)
       exit(1);
     }
     simulation->makePartner(agents[from], agents[to],
-                            simulation->distance(agents[from], agents[to]),
-                            simulation->meanDaysRelationship);
+                            simulation->distance(agents[from], agents[to]));
   }
   fclose(f);
 }
@@ -1742,6 +1817,7 @@ void runTests(ParameterMap& parameterMap)
   simulation.agents[3]->age = 25;
   simulation.agents[3]->sex = FEMALE;
   simulation.agents[3]->desired_age = 25;
+  // simulation.agents[3]->relationship_length_factor = 0;
   simulation.agents[3]->sexual_orientation = HOMOSEXUAL;
 
   simulation.agents[4]->age = 30;
@@ -1753,6 +1829,13 @@ void runTests(ParameterMap& parameterMap)
   simulation.agents[5]->sex = MALE;
   simulation.agents[5]->desired_age = 20;
   simulation.agents[5]->sexual_orientation = HOMOSEXUAL;
+
+  simulation.agents[6]->age = 25;
+  simulation.agents[6]->sex = MALE;
+  simulation.agents[6]->desired_age = 25;
+  // simulation.agents[6]->relationship_length_factor = 0;
+  simulation.agents[6]->sexual_orientation = HETEROSEXUAL;
+
 
   double d1 = simulation.heuristicDistance(simulation.agents[0],
                                           simulation.agents[2]);
@@ -1815,7 +1898,27 @@ void runTests(ParameterMap& parameterMap)
   d2 = simulation.tableDistance(simulation.agents[5],
                                 simulation.agents[1]);
   TESTEQ(d1, d2, successes, failures);
+
+  simulation.shapeRelationshipLength =
+    CSVParser(parameterMap.at("SHAPE_REL_CSV").stringValue.
+              c_str(), ",", true).convert_all_entries_to_doubles();
+  simulation.scaleRelationshipLength =
+      CSVParser(parameterMap.at("SCALE_REL_CSV").stringValue.
+                c_str(), ",", true).convert_all_entries_to_doubles();
+  simulation.agents[6]->partner = simulation.agents[3];
+  simulation.agents[3]->partner = simulation.agents[6];
+  // printf("D2: %.2f %.2f\n",
+  //        simulation.agents[6]->age, simulation.agents[6]->partner->age);
+  // for (int i = 0; i < 100; ++i) {
+  //   simulation.agents[6]->
+  //     setRelationshipLength(2017.00,
+  //                           simulation.muRelationshipLength,
+  //                           simulation.sigmaRelationshipLength);
+  //   printf("D4,%.2f\n", simulation.agents[6]->relationship_change_date - 2017.0);
+  // }
+
   printf("Successes: %u. Failures: %u.\n", successes, failures);
+
 }
 
 /***************************/
