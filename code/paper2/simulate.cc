@@ -16,6 +16,7 @@
 #include <random>
 #include <map>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <unordered_set>
@@ -248,7 +249,21 @@ struct ParameterValue {
   std::string stringValue;
 };
 
+#if DEBUG
+class ParameterMap  : public std::map<std::string,  ParameterValue>  {
+public:
+  const ParameterValue& at ( const std::string& s ) const {
+    try {
+      return std::map<std::string,  ParameterValue>::at(s);
+    } catch (const std::out_of_range& oor) {
+      std::cerr << "Parameter not found: " << s << std::endl;
+      exit(1);
+    }
+  }
+};
+#else
 typedef std::map<std::string,  ParameterValue> ParameterMap;
+#endif
 
 void printParameters(ParameterMap& parameterMap)
 {
@@ -333,16 +348,7 @@ void setDefaultParameters(ParameterMap& parameterMap)
   addParameter(parameterMap, "NUM_THREADS",
                "Number of threads (default is one per simulation - 0)", {0});
   addParameter(parameterMap, "NUM_AGENTS", "Number of agents", {100.0});
-  addParameter(parameterMap, "MALE_INFECTIVITY", "How easily males are infected",
-               {0.1});
-  addParameter(parameterMap, "FEMALE_INFECTIVITY",
-               "How easily females are infected", {0.2});
-  addParameter(parameterMap, "MALE_INFECTIOUSNESS",
-               "How likely males are to infect their partners", {0.2});
-  addParameter(parameterMap, "FEMALE_INFECTIOUSNESS",
-               "How easily females are infected", {0.1});
-  addParameter(parameterMap, "BREAKUPINESS",
-               "How easily partners breakup", {0.1});
+
   addParameter(parameterMap, "START_DATE",
                "Start date of simulation", {2017.0});
   addParameter(parameterMap, "END_DATE",
@@ -352,35 +358,12 @@ void setDefaultParameters(ParameterMap& parameterMap)
   addParameter(parameterMap, "PREV_PARTNER_PENALTY",
                "Previous partner penalty in pair matching", {10.0});
 
-  addParameter(parameterMap, "MEAN_RELATIONSHIP_LENGTH_DEVIATION",
-               "Mean difference from expected relationship length.", {0});
-  addParameter(parameterMap, "SD_RELATIONSHIP_LENGTH_DEVIATION",
-               "Standard deviation of relationship lengths.", {3.0});
-
   addParameter(parameterMap, "SHAPE_REL_CSV",
                "File of shapes for partnership", "data/Rel_shape.csv");
 
   addParameter(parameterMap, "SCALE_REL_CSV",
                "File of scales for partnership", "data/Rel_scale.csv");
 
-
-  addParameter(parameterMap, "SHAPE_SINGLE",
-               "Shape for Weibull distribution of time spent single", {0.4});
-  addParameter(parameterMap, "SCALE_SINGLE",
-               "Scale for Weibull distribution of time spent single", {100.0});
-
-
-  //addParameter(parameterMap, "MEAN_DAYS_RELATIONSHIP",
-  //             "Mean number of days agents are partners", {365.0});
-  //addParameter(parameterMap, "MEAN_DAYS_SINGLE",
-  //             "Mean number of days agents are single", {7.0});
-
-  addParameter(parameterMap, "HET_MALE_INFECTIVITY",
-               "Daily risk of getting infected for male in heterosexual sex",
-               {0.001});
-  addParameter(parameterMap, "HET_FEMALE_INFECTIVITY",
-               "Daily risk of getting infected for female in heterosexual sex",
-               {0.005});
   addParameter(parameterMap, "HET_MALE_INFECTIOUSNESS",
                "Daily risk of infecting for male in heterosexual sex",
                {0.005});
@@ -388,12 +371,6 @@ void setDefaultParameters(ParameterMap& parameterMap)
                "Daily risk of infecting for female in heterosexual sex",
                {0.001});
 
-  addParameter(parameterMap, "HOM_MALE_INFECTIVITY",
-               "Daily risk of getting infected for male in homosexual sex",
-               {0.005});
-  addParameter(parameterMap, "HOM_FEMALE_INFECTIVITY",
-               "Daily risk of getting infected for female in homosexual sex",
-               {0.0001});
   addParameter(parameterMap, "HOM_MALE_INFECTIOUSNESS",
                "Daily risk of infecting for male in homosexual sex",
                {0.005});
@@ -466,6 +443,8 @@ void setDefaultParameters(ParameterMap& parameterMap)
   addParameter(parameterMap, "INITIAL_INFECTION_RATES_CSV",
                "Initial infection rates in population",
                "data/initial_rates.csv");
+  addParameter(parameterMap, "SCALE_INITIAL_RATES",
+               "Scale the initial infection rates by this value", {1.0});
 
   addParameter(parameterMap, "AGE_EVENT", "Execute the aging event", {1});
   addParameter(parameterMap, "INFECT_EVENT", "Execute the infection event", {1});
@@ -482,6 +461,31 @@ void setDefaultParameters(ParameterMap& parameterMap)
 
   addParameter(parameterMap, "RANDOM_SEED", "Value to set random seed to",
                {1});
+
+  // Parameters that may need to be fitted
+  addParameter(parameterMap, "SHAPE_SINGLE_PERIOD_INITIAL",
+               "Weibull shape of single period at begin of simulation", {0.85});
+  addParameter(parameterMap, "SCALE_SINGLE_PERIOD_INITIAL",
+               "Weibull scale of single period at begin of simulation", {1200.0});
+  addParameter(parameterMap, "SHAPE_SINGLE_PERIOD_DURING",
+               "Mean difference from expected relationship length", {0.4});
+  addParameter(parameterMap, "SCALE_SINGLE_PERIOD_DURING",
+               "Standard deviation of relationship PERIOD", {100.0});
+  addParameter(parameterMap, "MEAN_SINGLE_PERIOD",
+               "Mean difference from expected single period", {0});
+  addParameter(parameterMap, "SD_SINGLE_PERIOD",
+               "Standard deviation of single period", {3.0});
+
+  addParameter(parameterMap, "SCALE_RELATIONSHIP_PERIOD_INITIAL",
+               "Multiple relationship scale parameters by this", {1.0 / 3.0});
+  addParameter(parameterMap, "SCALE_RELATIONSHIP_PERIOD_DURING",
+               "Multiple relationship scale parameters by this", {1.0});
+  addParameter(parameterMap, "MEAN_RELATIONSHIP_PERIOD",
+               "Mean difference from expected relationship period.", {0});
+  addParameter(parameterMap, "SD_RELATIONSHIP_PERIOD",
+               "Standard deviation of relationship period.", {3.0});
+
+
 }
 
 void readParameters(std::istream& input,
@@ -526,15 +530,11 @@ public:
   Agent* partner;
   Agent* infector = NULL;
 
-  double mu_relationship_length;
-  double mu_single_length;
-  double relationship_change_date;
+  double singlePeriodDeviation;
+  double relationshipPeriodDeviation;
+  double relationshipChangeDate;
   double age;
   double desired_age;
-  double het_infectivity;
-  double het_infectiousness;
-  double hom_infectivity;
-  double hom_infectiousness;
   double weight; // Used by some pair-matching algorithms
 
   unsigned short sex;
@@ -546,9 +546,10 @@ public:
   unsigned num_infected = 0;
 
 
-  void setRelationshipLength(const double current_date,
-                             const DblMatrix& shapeRelationshipLength,
-                             const DblMatrix& scaleRelationshipLength)
+  void setRelationshipPeriod(const double currentDate,
+                             const DblMatrix& shapeRelationshipPeriod,
+                             const DblMatrix& scaleRelationshipPeriod,
+                             const double scaleModifierRelationshipPeriod)
   {
     double shape, scale;
     size_t index1, index2;
@@ -563,36 +564,29 @@ public:
                          (unsigned) MAX_AGE_WEIBULL);
     }
 
-    shape = shapeRelationshipLength[ index1 ] [ index2 ];
-    // scale = scaleRelationshipLength[ index1 ] [index2];
-    // THIS IS WRONG BUT TESTING
-    scale = scaleRelationshipLength[ index1 ] [index2] / 3.0;
-
-
-    //mu += (relationship_length_factor +
-    //       partner->relationship_length_factor) / 2.0;
+    shape = shapeRelationshipPeriod[ index1 ] [ index2 ];
+    scale = scaleRelationshipPeriod[ index1 ] [ index2 ] *
+      scaleModifierRelationshipPeriod;
+    scale += relationshipPeriodDeviation + partner->relationshipPeriodDeviation;
     std::weibull_distribution<double> dist(shape, scale);
     double relationshipLength = dist(rng);
-    relationship_change_date = current_date + relationshipLength;
-    partner->relationship_change_date = relationship_change_date;
-    printf("D0,%.3f,%.3f\n", current_date, relationship_change_date);
+    relationshipChangeDate = std::max(currentDate,
+                                      currentDate + relationshipLength);
+    partner->relationshipChangeDate = relationshipChangeDate;
   }
 
-  void setSingleLength(double current_date,
+  void setSinglePeriod(double currentDate,
                        double shape, double scale)
   {
-    // std::binomial_distribution<int> dist (mean_days_single,
-    //                                       binomial_p_relationship_wait);
-    std::weibull_distribution<double> dist(shape, scale);
-    // THIS ISN'T GOOD ENOUGH BUT IT'S A FILLER UNTIL WE'VE FIGURED IT OUT
-    // std::uniform_real_distribution<double> dist(0, 730.0);
-    /****************************************/
-    relationship_change_date = current_date + (double) dist(rng) * DAY;
+    std::weibull_distribution<double> dist(shape,
+                                           scale + singlePeriodDeviation);
+    relationshipChangeDate = max(currentDate,
+                                 currentDate + (double) dist(rng) * DAY);
   }
 
-  bool isMatchable(const double current_date) const
+  bool isMatchable(const double currentDate) const
   {
-    if (partner == NULL && (current_date + DAY / 2.0) >= relationship_change_date)
+    if (partner == NULL && (currentDate + DAY / 2.0) >= relationshipChangeDate)
       return true;
     else
       return false;
@@ -609,7 +603,7 @@ public:
       fprintf(f,",%7u", partner->id);
     else
       fprintf(f, ",      0");
-    fprintf(f, ",Date,%.3f,Infection,%d\n", relationship_change_date, infected);
+    fprintf(f, ",Date,%.3f,Infection,%d\n", relationshipChangeDate, infected);
   }
 };
 
@@ -638,7 +632,7 @@ ostream& operator<<(ostream& os, const Agent& agent)
                               ? "S" : "G")
        << ",Desired," << p->desired_age;
   }
-  os << ",Date," << agent.relationship_change_date;
+  os << ",Date," << agent.relationshipChangeDate;
   return os;
 }
 
@@ -646,11 +640,11 @@ typedef std::vector<Agent *> AgentVector;
 
 void printAgents(const AgentVector& agents,
                  unsigned simulation_num,
-                 double current_date,
+                 double currentDate,
                  FILE *out)
 {
   for (auto& agent: agents) {
-    fprintf(out, "AGENT,%u,%f,", simulation_num, current_date);
+    fprintf(out, "AGENT,%u,%f,", simulation_num, currentDate);
     agent->print(out);
   }
 }
@@ -701,25 +695,6 @@ struct PartnershipScore {
 
 // Initialization routines
 
-void setAgentInfectionParameters(Agent& agent,
-                                 double het_male_infectivity,
-                                 double het_female_infectivity,
-                                 double het_male_infectiousness,
-                                 double het_female_infectiousness,
-                                 double hom_male_infectivity,
-                                 double hom_female_infectivity,
-                                 double hom_male_infectiousness,
-                                 double hom_female_infectiousness)
-{
-  agent.het_infectivity =
-    agent.sex == MALE ? het_male_infectivity : het_female_infectivity;
-  agent.hom_infectivity =
-    agent.sex == MALE ? hom_male_infectivity : hom_female_infectivity;
-  agent.het_infectiousness =
-    agent.sex == MALE ? het_male_infectiousness : het_female_infectiousness;
-  agent.hom_infectiousness =
-    agent.sex == MALE ? hom_male_infectiousness : hom_female_infectiousness;
-}
 
 void setInitialInfection(Agent &agent,
                          const std::vector<double>& initialInfectionRatesMSW,
@@ -762,8 +737,38 @@ public:
     clusters = parameterMap.at("MATCH_CLUSTERS").getDbl();
     failureThresholdScore = parameterMap.at("MATCH_SCORE_FAIL").getDbl();
     poorThresholdScore = parameterMap.at("MATCH_SCORE_POOR").getDbl();
-    shapeSingle = parameterMap.at("SHAPE_SINGLE").getDbl();
-    scaleSingle = parameterMap.at("SCALE_SINGLE").getDbl();
+
+    // Infectiousness parameters
+    het_male_infectiousness =
+      parameterMap.at("HET_MALE_INFECTIOUSNESS").getDbl();
+    het_female_infectiousness =
+      parameterMap.at("HET_FEMALE_INFECTIOUSNESS").getDbl();
+    hom_male_infectiousness =
+      parameterMap.at("HOM_MALE_INFECTIOUSNESS").getDbl();
+    hom_female_infectiousness =
+      parameterMap.at("HOM_FEMALE_INFECTIOUSNESS").getDbl();
+
+    // Single period parameters
+    shapeSinglePeriodInitial =
+      parameterMap.at("SHAPE_SINGLE_PERIOD_INITIAL").getDbl();
+    scaleSinglePeriodInitial =
+      parameterMap.at("SCALE_SINGLE_PERIOD_INITIAL").getDbl();
+    shapeSinglePeriodDuring =
+      parameterMap.at("SHAPE_SINGLE_PERIOD_DURING").getDbl();
+    scaleSinglePeriodDuring =
+      parameterMap.at("SCALE_SINGLE_PERIOD_DURING").getDbl();
+    meanSinglePeriodDeviation =
+      parameterMap.at("MEAN_SINGLE_PERIOD").getDbl();
+    sdSinglePeriodDeviation =
+      parameterMap.at("SD_SINGLE_PERIOD").getDbl();
+
+    // Relationship period parameters
+    meanRelationshipPeriodDeviation =
+      parameterMap.at("MEAN_RELATIONSHIP_PERIOD").getDbl();
+    sdRelationshipPeriodDeviation =
+      parameterMap.at("SD_RELATIONSHIP_PERIOD").getDbl();
+
+
 
     string s = parameterMap.at("DISTANCE_METHOD").getStr();
     if (s == "HEURISTIC")
@@ -825,15 +830,6 @@ public:
     unsigned analyze_frequency =
       parameterMap.at("ANALYZE_DURING_SIM").getDbl(1);
 
-    //// Debug
-    // std::cout << "D1," << agents.size() << std::endl;
-    // for (auto &a:agents) {
-    //   std::cout << "D0," << simulationName << ","
-    //             << a->relationship_change_date
-    //             << "," << a->partner << std::endl;
-    // }
-    /////
-
     for (unsigned i = 0; i < num_iterations; ++i, currentDate += timeStep) {
       for (auto& e: events) e(this);
 
@@ -859,6 +855,7 @@ public:
     analyzeAgents = parameterMap.at("ANALYZE_AT_END").getDbl();
     if (analyzeAgents) analysis();
   }
+
   void initializeAgents()
   {
     unsigned numIntervals = (MAX_AGE + 1) / ageInterval + 1;
@@ -893,6 +890,7 @@ public:
 
     CSVParser infectionRatesCsv(parameterMap.at("INITIAL_INFECTION_RATES_CSV").
                                 stringValue.c_str(), ",", true);
+    double scaleInitialRates = parameterMap.at("SCALE_INITIAL_RATES").getDbl();
     DblMatrix initialRatesMatrix =
       infectionRatesCsv.convert_all_entries_to_doubles();
     std::vector<double> initialInfectionRatesMSW(MAX_AGE + 1, 0.0);
@@ -904,10 +902,10 @@ public:
       for (auto& row : initialRatesMatrix) {
         for (;i <= row[0] && i < MAX_AGE + 1; ++i) {
           assert(i <= MAX_AGE);
-          initialInfectionRatesMSW[i] = row[1];
-          initialInfectionRatesMSM[i] = row[2];
-          initialInfectionRatesWSM[i] = row[3];
-          initialInfectionRatesWSW[i] = row[4];
+          initialInfectionRatesMSW[i] = row[1] * scaleInitialRates;
+          initialInfectionRatesMSM[i] = row[2] * scaleInitialRates;
+          initialInfectionRatesWSM[i] = row[3] * scaleInitialRates;
+          initialInfectionRatesWSW[i] = row[4] * scaleInitialRates;
         }
       }
       for (; i <= MAX_AGE; ++i) {
@@ -929,6 +927,11 @@ public:
     auto femRatio = getCol(singles, 2);
     auto msmRate = getCol(singles, 3);
     auto wswRate = getCol(singles, 4);
+
+    // Relationship period parameter for beginning of period
+    scaleModifierRelationshipPeriod =
+      parameterMap.at("SCALE_RELATIONSHIP_PERIOD_INITIAL").getDbl();
+
     createPartners(agents, parameterMap, data, 0, S, ageRange, ageShare, femRatio,
                    wswRate, msmRate, ww, mw, wm, mm,
                    initialInfectionRatesMSW, initialInfectionRatesMSM,
@@ -977,12 +980,14 @@ public:
       }
     }
     agents.shrink_to_fit();
+
+    // Relationship period parameter for during simulation
+    scaleModifierRelationshipPeriod =
+      parameterMap.at("SCALE_RELATIONSHIP_PERIOD_DURING").getDbl();
   }
 
   inline void initAgent(Agent *agent,
                         const unsigned id,
-                        float mean_relationship_length_deviation,
-                        float sd_relationship_length_deviation,
                         Sample& sampleAgeshare,
                         const std::vector<double>& femRatio,
                         const std::vector<double>& wswRate,
@@ -997,8 +1002,11 @@ public:
                         std::vector<Sample>& sample_matMM)
   {
     std::uniform_real_distribution<double> uni;
-    std::normal_distribution<double> norm(mean_relationship_length_deviation,
-                                          sd_relationship_length_deviation);
+    std::normal_distribution<double>
+      distSingle(meanSinglePeriodDeviation, sdSinglePeriodDeviation);
+    std::normal_distribution<double>
+      distRelationship(meanRelationshipPeriodDeviation,
+                       sdRelationshipPeriodDeviation);
 
     agent->id = id;
     // Age
@@ -1029,6 +1037,9 @@ public:
       agent->desired_age = sample_matMW[age - 12]() + 12;
     else
       agent->desired_age = sample_matMM[age - 12]() + 12;
+
+    agent->singlePeriodDeviation = distSingle(rng);
+    agent->relationshipPeriodDeviation = distRelationship(rng);
 
     // agent->relationship_length_factor = 0; // norm(rng);
 
@@ -1069,26 +1080,10 @@ public:
                       bool initial_relation)
   {
     std::uniform_real_distribution<double> uni;
-    double het_male_infectivity =
-      parameterMap.at("HET_MALE_INFECTIVITY").getDbl();
-    double het_male_infectiousness =
-      parameterMap.at("HET_MALE_INFECTIOUSNESS").getDbl();
-    double het_female_infectivity =
-      parameterMap.at("HET_FEMALE_INFECTIVITY").getDbl();
-    double het_female_infectiousness =
-      parameterMap.at("HET_FEMALE_INFECTIOUSNESS").getDbl();
-    double hom_male_infectivity =
-      parameterMap.at("HOM_MALE_INFECTIVITY").getDbl();
-    double hom_male_infectiousness =
-      parameterMap.at("HOM_MALE_INFECTIOUSNESS").getDbl();
-    double hom_female_infectivity =
-      parameterMap.at("HOM_FEMALE_INFECTIVITY").getDbl();
-    double hom_female_infectiousness =
-      parameterMap.at("HOM_FEMALE_INFECTIOUSNESS").getDbl();
-    double mean_relationship_length_deviation =
-      parameterMap.at("MEAN_RELATIONSHIP_LENGTH_DEVIATION").getDbl();
-    double sd_relationship_length_deviation =
-      parameterMap.at("SD_RELATIONSHIP_LENGTH_DEVIATION").getDbl();
+    double shapeSinglePeriodInitial =
+      parameterMap.at("SHAPE_SINGLE_PERIOD_INITIAL").getDbl();
+    double scaleSinglePeriodInitial =
+      parameterMap.at("SCALE_SINGLE_PERIOD_INITIAL").getDbl();
     Sample sample_ageshare(ageShare, &rng);
     vector<Sample> sample_matWW(matWW[0].size());
     vector<Sample> sample_matMW(matMW[0].size());
@@ -1108,8 +1103,6 @@ public:
     for (unsigned i = fromAgent; (i + increment - 1) < toAgent; i += increment) {
       Agent *agent = new Agent();
       initAgent(agent, i + 1,
-                mean_relationship_length_deviation,
-                sd_relationship_length_deviation,
                 sample_ageshare,
                 femRatio,
                 wswRate,
@@ -1122,86 +1115,57 @@ public:
                 sample_matMW,
                 sample_matWM,
                 sample_matMM);
-    setAgentInfectionParameters(*agent,
-                                het_male_infectivity,
-                                het_female_infectivity,
-                                het_male_infectiousness,
-                                het_female_infectiousness,
-                                hom_male_infectivity,
-                                hom_female_infectivity,
-                                hom_male_infectiousness,
-                                hom_female_infectiousness);
-      if (initial_relation) {
-        // Relationship
-        agent->initial_relationship = true;
-        Agent* partner = new Agent();
-        initAgent(partner, i + 2,
-                  mean_relationship_length_deviation,
-                  sd_relationship_length_deviation,
-                  sample_ageshare,
-                  femRatio,
-                  wswRate,
-                  msmRate,
-                  initialInfectionRatesMSW,
-                  initialInfectionRatesMSM,
-                  initialInfectionRatesWSM,
-                  initialInfectionRatesWSW,
-                  sample_matWW,
-                  sample_matMW,
-                  sample_matWM,
-                  sample_matMM);
-        // Orientation = partner's orientation
-        partner->sexual_orientation = agent->sexual_orientation;
-        // Partner sex
-        if (agent->sexual_orientation == HETEROSEXUAL) {
-          if (agent->sex == MALE)
-            partner->sex = FEMALE;
-          else
-            partner->sex = MALE;
-        } else {
-          partner->sex = agent->sex;
-        }
-        partner->age = agent->desired_age;
-        // Partner in relationship
-        partner->initial_relationship = true;
-        // Preferred age of partner
-        partner->desired_age = agent->age;
-        // partner infection risk parameters
-        setInitialInfection(*partner, initialInfectionRatesMSW,
-                            initialInfectionRatesMSM, initialInfectionRatesWSM,
-                            initialInfectionRatesWSW);
-        setAgentInfectionParameters(*partner,
-                                    het_male_infectivity,
-                                    het_female_infectivity,
-                                    het_male_infectiousness,
-                                    het_female_infectiousness,
-                                    hom_male_infectivity,
-                                    hom_female_infectivity,
-                                    hom_male_infectiousness,
-                                    hom_female_infectiousness);
-        makePartner(agent, partner, distance(agent, partner));
-        // Correct relationship time because this is in the middle of relationship
-        //std::uniform_real_distribution<double>
-        //  uni2(currentDate, agent->relationship_change_date);
-        //agent->relationship_change_date = uni2(rng);
-        //partner->relationship_change_date = agent->relationship_change_date;
-      } else {
-        // Best so far in order
-        agent->setSingleLength(currentDate, 0.85, 1200.0);
-        // agent->setSingleLength(currentDate, 0.7, 1500.0);
-        // agent->setSingleLength(currentDate, 0.7, 1400.0);
-        // agent->setSingleLength(currentDate, 0.8, 1400.0);
-        // agent->setSingleLength(currentDate, 0.8, 1500.0);
 
-        // Correct single time because this is in the middle of relationship
-        //std::uniform_real_distribution<double>
-        //  uni2(currentDate, agent->relationship_change_date);
-        //agent->relationship_change_date = uni2(rng);
-        //agent->partner = NULL;
+    if (initial_relation) {
+      // Relationship
+      agent->initial_relationship = true;
+      Agent* partner = new Agent();
+      initAgent(partner, i + 2,
+                sample_ageshare,
+                femRatio,
+                wswRate,
+                msmRate,
+                initialInfectionRatesMSW,
+                initialInfectionRatesMSM,
+                initialInfectionRatesWSM,
+                initialInfectionRatesWSW,
+                sample_matWW,
+                sample_matMW,
+                sample_matWM,
+                sample_matMM);
+      // Orientation = partner's orientation
+      partner->sexual_orientation = agent->sexual_orientation;
+      // Partner sex
+      if (agent->sexual_orientation == HETEROSEXUAL) {
+        if (agent->sex == MALE)
+          partner->sex = FEMALE;
+        else
+          partner->sex = MALE;
+      } else {
+        partner->sex = agent->sex;
       }
-      agents.push_back(agent);
-      if (agent->partner)
-        agents.push_back(agent->partner);
+      partner->age = agent->desired_age;
+      // Partner in relationship
+      partner->initial_relationship = true;
+      // Preferred age of partner
+      partner->desired_age = agent->age;
+      // partner infection risk parameters
+      setInitialInfection(*partner, initialInfectionRatesMSW,
+                          initialInfectionRatesMSM, initialInfectionRatesWSM,
+                          initialInfectionRatesWSW);
+
+      makePartner(agent, partner, distance(agent, partner));
+      // Correct relationship time because this is in the middle of relationship
+      std::uniform_real_distribution<double>
+      uni2(currentDate, agent->relationshipChangeDate);
+      agent->relationshipChangeDate = uni2(rng);
+      partner->relationshipChangeDate = agent->relationshipChangeDate;
+    } else {
+      agent->setSinglePeriod(currentDate, shapeSinglePeriodInitial,
+                             scaleSinglePeriodInitial);
+    }
+    agents.push_back(agent);
+    if (agent->partner) agents.push_back(agent->partner);
     }
   }
 
@@ -1216,10 +1180,10 @@ public:
                            c_str(), ",", true).convert_all_entries_to_doubles();
     wsmAgeDist = CSVParser(parameterMap.at("WSM_AGE_DIST_CSV").stringValue.
                            c_str(), ",", true).convert_all_entries_to_doubles();
-    shapeRelationshipLength =
+    shapeRelationshipPeriod =
       CSVParser(parameterMap.at("SHAPE_REL_CSV").stringValue.
                 c_str(), ",", true).convert_all_entries_to_doubles();
-    scaleRelationshipLength =
+    scaleRelationshipPeriod =
       CSVParser(parameterMap.at("SCALE_REL_CSV").stringValue.
                 c_str(), ",", true).convert_all_entries_to_doubles();
     setEvents();
@@ -1274,6 +1238,8 @@ public:
     shuffle(matingPool.begin(), matingPool.end(), rng);
     // Remove back agent if odd
     if (matingPool.size() % 2 == 1) matingPool.pop_back();
+    printf("%s,MATINGPOOL,%u,%.3f,%lu\n", simulationName.c_str(),
+           simulationNum, currentDate, matingPool.size());
     return matingPool;
   }
 
@@ -1392,8 +1358,9 @@ public:
       partnerships.insert(a->id, b->id);
       a->partner = b;
       b->partner = a;
-      a->setRelationshipLength(currentDate, shapeRelationshipLength,
-                               scaleRelationshipLength);
+      a->setRelationshipPeriod(currentDate, shapeRelationshipPeriod,
+                               scaleRelationshipPeriod,
+                               scaleModifierRelationshipPeriod);
       ++a->num_partners;
       ++b->num_partners;
       ++totalPartnerships;
@@ -1488,8 +1455,24 @@ public:
   double startDate;
   double endDate;
   double timeStep;
-  double shapeSingle;
-  double scaleSingle;
+
+  double shapeSinglePeriodInitial;
+  double scaleSinglePeriodInitial;
+  double shapeSinglePeriodDuring;
+  double scaleSinglePeriodDuring;
+  double meanSinglePeriodDeviation;
+  double sdSinglePeriodDeviation;
+
+  double scaleModifierRelationshipPeriod;
+  double meanRelationshipPeriodDeviation;
+  double sdRelationshipPeriodDeviation;
+
+  double het_male_infectiousness;
+  double hom_male_infectiousness;
+  double het_female_infectiousness;
+  double hom_female_infectiousness;
+
+
   double currentDate;
   double failureThresholdScore;
   double poorThresholdScore;
@@ -1528,8 +1511,8 @@ public:
   std::vector<unsigned> infectedMalesByAge;
   std::vector<unsigned> infectedFemalesByAge;
 
-  DblMatrix shapeRelationshipLength;
-  DblMatrix scaleRelationshipLength;
+  DblMatrix shapeRelationshipPeriod;
+  DblMatrix scaleRelationshipPeriod;
   DblMatrix mswAgeDist;
   DblMatrix wsmAgeDist;
   DblMatrix msmAgeDist;
@@ -1550,12 +1533,21 @@ void infectEvent(Simulation* simulation)
     if (agent->partner && agent->infected == false &&
         agent->partner->infected == true) {
       double risk_infection;
-      if (agent->partner->sex == agent->sex)
-        risk_infection = (agent->hom_infectivity +
-                          agent->partner->hom_infectiousness) / 2.0;
-      else
-        risk_infection = (agent->het_infectivity +
-                          agent->partner->het_infectiousness) / 2.0;
+
+      if (agent->partner->sex == agent->sex) {
+        if (agent->sex == MALE) {
+          risk_infection = simulation->hom_male_infectiousness;
+        } else {
+          risk_infection = simulation->hom_female_infectiousness;
+        }
+      } else {
+        if (agent->sex == MALE) {
+          risk_infection = simulation->het_female_infectiousness;
+        } else {
+          risk_infection = simulation->het_male_infectiousness;
+        }
+      }
+
       if (dist(rng) < risk_infection) {
         agent->infected = true;
         agent->infector = agent->partner;
@@ -1571,18 +1563,20 @@ void breakupEvent(Simulation* simulation)
   unsigned breakups = 0;
   for (auto& agent: simulation->agents) {
     if (agent->partner &&
-        (simulation->currentDate >= agent->relationship_change_date) ) {
+        (simulation->currentDate >= agent->relationshipChangeDate) ) {
       Agent* partner = agent->partner;
       agent->partner = NULL;
       partner->partner = NULL;
-      agent->setSingleLength(simulation->currentDate,
-                             simulation->shapeSingle, simulation->scaleSingle);
-      partner->setSingleLength(simulation->currentDate,
-                               simulation->shapeSingle, simulation->scaleSingle);
+      agent->setSinglePeriod(simulation->currentDate,
+                             simulation->shapeSinglePeriodDuring,
+                             simulation->scaleSinglePeriodDuring);
+      partner->setSinglePeriod(simulation->currentDate,
+                               simulation->shapeSinglePeriodDuring,
+                               simulation->scaleSinglePeriodDuring);
       ++breakups;
     }
   }
-  printf("%s,BREAKUP,CSPM,%u,%.3f,%u\n", simulation->simulationName.c_str(),
+  printf("%s,BREAKUPS,%u,%.3f,%u\n", simulation->simulationName.c_str(),
          simulation->simulationNum, simulation->currentDate,
          breakups);
   simulation->totalBreakups += breakups;
@@ -1601,22 +1595,10 @@ void randomMatchEvent(Simulation* simulation)
       simulation->makePartner(unmatchedAgents[i], unmatchedAgents[i + 1],
                               simulation->distance(unmatchedAgents[i],
                                                    unmatchedAgents[i + 1]));
-
-  // gettimeofday(&timeEnd, NULL);
-  // elapsedTime = timeEnd.tv_sec - timeBegin.tv_sec;
-  // printf("%s,PM_TIMING,RPM,%u,%f\n", simulation->simulationName.c_str(),
-  //          simulation->simulationNum, elapsedTime);
-  //printf("%s,PM_SIZE,RPM,%u,%lu\n", simulation->simulationName.c_str(),
-  //       simulation->simulationNum, unmatchedAgents.size());
 }
 
 void randomKMatchEvent(Simulation *simulation)
 {
-  // struct timeval timeBegin, timeEnd;
-  // double elapsedTime;
-  // gettimeofday(&timeBegin, NULL);
-
-
   std::uniform_real_distribution<double> uni;
   AgentVector unmatchedAgents = simulation->getShuffledUnmatchedAgents();
 
@@ -1633,21 +1615,10 @@ void randomKMatchEvent(Simulation *simulation)
       }
     }
   }
-
-  // gettimeofday(&timeEnd, NULL);
-  // elapsedTime = timeEnd.tv_sec - timeBegin.tv_sec;
-  // printf("%s,PM_TIMING,RKPM,%u,%f\n", simulation->simulationName.c_str(),
-  //          simulation->simulationNum, elapsedTime);
-  // printf("%s,PM_SIZE,RKPM,%u,%lu\n", simulation->simulationName.c_str(),
-  //        simulation->simulationNum, unmatchedAgents.size());
 }
 
 void clusterShuffleMatchEvent(Simulation* simulation)
 {
-  // struct timeval timeBegin, timeEnd;
-  // double elapsedTime;
-  // gettimeofday(&timeBegin, NULL);
-
   AgentVector unmatchedAgents = simulation->getShuffledUnmatchedAgents();
   uint64_t cluster_size = unmatchedAgents.size() / simulation->clusters;
   for (auto& a : unmatchedAgents) a->weight = simulation->clusterValue(a);
@@ -1672,20 +1643,6 @@ void clusterShuffleMatchEvent(Simulation* simulation)
       }
     }
   }
-  // gettimeofday(&timeEnd, NULL);
-  // elapsedTime = timeEnd.tv_sec - timeBegin.tv_sec;
-  // printf("%s,PM_TIMING,CSPM,%u,%f\n", simulation->simulationName.c_str(),
-  //          simulation->simulationNum, elapsedTime);
-  printf("%s,PM_SIZE,CSPM,%u,%.3f,%lu\n", simulation->simulationName.c_str(),
-         simulation->simulationNum, simulation->currentDate,
-         unmatchedAgents.size());
-  // auto &p = simulation->partnerships.partnerships;
-  // printf("%s,PM_SET,CSPM,%u,%.2f-%.2f-%lu-%lu\n",
-  //        simulation->simulationName.c_str(),
-  //        simulation->simulationNum,
-  //        p.load_factor(), p.max_load_factor(),
-  //        p.bucket_count(), p.max_bucket_count());
-
 }
 
 
@@ -1899,10 +1856,10 @@ void runTests(ParameterMap& parameterMap)
                                 simulation.agents[1]);
   TESTEQ(d1, d2, successes, failures);
 
-  simulation.shapeRelationshipLength =
+  simulation.shapeRelationshipPeriod =
     CSVParser(parameterMap.at("SHAPE_REL_CSV").stringValue.
               c_str(), ",", true).convert_all_entries_to_doubles();
-  simulation.scaleRelationshipLength =
+  simulation.scaleRelationshipPeriod =
       CSVParser(parameterMap.at("SCALE_REL_CSV").stringValue.
                 c_str(), ",", true).convert_all_entries_to_doubles();
   simulation.agents[6]->partner = simulation.agents[3];
@@ -1911,7 +1868,7 @@ void runTests(ParameterMap& parameterMap)
   //        simulation.agents[6]->age, simulation.agents[6]->partner->age);
   // for (int i = 0; i < 100; ++i) {
   //   simulation.agents[6]->
-  //     setRelationshipLength(2017.00,
+  //     setRelationshipPeriod(2017.00,
   //                           simulation.muRelationshipLength,
   //                           simulation.sigmaRelationshipLength);
   //   printf("D4,%.2f\n", simulation.agents[6]->relationship_change_date - 2017.0);
