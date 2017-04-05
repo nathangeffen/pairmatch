@@ -1563,7 +1563,8 @@ void breakupEvent(Simulation* simulation)
   unsigned breakups = 0;
   for (auto& agent: simulation->agents) {
     if (agent->partner &&
-        (simulation->currentDate >= agent->relationshipChangeDate) ) {
+        ( (simulation->currentDate + DAY / 2.0) >=
+          agent->relationshipChangeDate) ) {
       Agent* partner = agent->partner;
       agent->partner = NULL;
       partner->partner = NULL;
