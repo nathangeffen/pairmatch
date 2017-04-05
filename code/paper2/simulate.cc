@@ -1,10 +1,10 @@
 /**
-    stisimulator: simulate.cc
-    Purpose: Microsimulation of sexually transmitted infection epidemics
+   stisimulator: simulate.cc
+   Purpose: Microsimulation of sexually transmitted infection epidemics
 
-    @author Nathan Geffen
-    @version 0.1 23/2/2017
-    @license GPL v3
+   @author Nathan Geffen
+   @version 0.1 23/2/2017
+   @license GPL v3
 */
 
 #include <algorithm>
@@ -55,32 +55,32 @@ thread_local std::mt19937 rng;
 #define HETEROSEXUAL 1
 
 /**
-    Macro used for unit testing.  Tests if two values are equal, incrementing
-    successes if true, else incrementing failures.
+   Macro used for unit testing.  Tests if two values are equal, incrementing
+   successes if true, else incrementing failures.
 
-    @param x the first value to test
-    @param y the second value to test
-    @param successes integer to increment if test is successful
-    @param failures integer to increment if test fails
+   @param x the first value to test
+   @param y the second value to test
+   @param successes integer to increment if test is successful
+   @param failures integer to increment if test fails
 */
 
-#define TESTEQ(x, y, successes, failures)                               \
-  do {                                                                  \
-    auto _t1 = (x);                                                     \
-    auto _t2 = (y);                                                     \
-    std::string _t3(#x);                                                \
-    std::string _t4(#y);                                                \
-    if (_t1 == _t2) {                                                   \
-      cout << "PASS:\t" << _t3 << " == " << _t4                         \
-           << "\tLine:" << __LINE__ << "\n";                            \
-      ++successes;                                                      \
-    }                                                                   \
-    else {                                                              \
-      cout << "FAIL:\t" << _t3 << " == " << _t4                         \
-           << "\t" << _t1 << " != " << _t2                              \
-           << "\tLine:" << __LINE__ << "\n";                            \
-      ++failures;                                                       \
-    }                                                                   \
+#define TESTEQ(x, y, successes, failures)       \
+  do {                                          \
+    auto _t1 = (x);                             \
+    auto _t2 = (y);                             \
+    std::string _t3(#x);                        \
+    std::string _t4(#y);                        \
+    if (_t1 == _t2) {                           \
+      cout << "PASS:\t" << _t3 << " == " << _t4 \
+           << "\tLine:" << __LINE__ << "\n";    \
+      ++successes;                              \
+    }                                           \
+    else {                                      \
+      cout << "FAIL:\t" << _t3 << " == " << _t4 \
+           << "\t" << _t1 << " != " << _t2      \
+           << "\tLine:" << __LINE__ << "\n";    \
+      ++failures;                               \
+    }                                           \
   } while(0)
 
 /**
@@ -88,11 +88,11 @@ thread_local std::mt19937 rng;
 */
 
 /**
-    Gets a column in a matrix.
+   Gets a column in a matrix.
 
-    @param matrix the matrix to get the column from
-    @param col the zero-indexed column in the matrix to return
-    @return matrix column as a vector of doubles
+   @param matrix the matrix to get the column from
+   @param col the zero-indexed column in the matrix to return
+   @return matrix column as a vector of doubles
 */
 
 std::vector<double> getCol(const DblMatrix& matrix, unsigned col)
@@ -104,11 +104,11 @@ std::vector<double> getCol(const DblMatrix& matrix, unsigned col)
 }
 
 /**
-    Calculates a vector subtracted from a scalar.
+   Calculates a vector subtracted from a scalar.
 
-    @param d scalar from which to subtract
-    @param v vector to subtract
-    @return vector = d - v
+   @param d scalar from which to subtract
+   @param v vector to subtract
+   @return vector = d - v
 */
 
 std::vector<double> subVector(double d,
@@ -121,11 +121,11 @@ std::vector<double> subVector(double d,
 }
 
 /**
-    Calculates a vector multiplied by a scalar.
+   Calculates a vector multiplied by a scalar.
 
-    @param d scalar to multiply
-    @param v vector to multiply
-    @return vector = d * v
+   @param d scalar to multiply
+   @param v vector to multiply
+   @return vector = d * v
 */
 
 std::vector<double> multVector(double d,
@@ -138,11 +138,11 @@ std::vector<double> multVector(double d,
 }
 
 /**
-    Calculates product of two vectors.
+   Calculates product of two vectors.
 
-    @param v1 vector to multiply
-    @param v2 vector to multiply
-    @return vector = v1 X v2
+   @param v1 vector to multiply
+   @param v2 vector to multiply
+   @return vector = v1 X v2
 */
 
 std::vector<double> multVectors(const std::vector<double>& v1,
@@ -155,11 +155,11 @@ std::vector<double> multVectors(const std::vector<double>& v1,
 }
 
 /**
-    Calculates sum of two vectors.
+   Calculates sum of two vectors.
 
-    @param v1 vector to add
-    @param v2 vector to add
-    @return vector = v1 + v2
+   @param v1 vector to add
+   @param v2 vector to add
+   @return vector = v1 + v2
 */
 
 std::vector<double> addVector(const std::vector<double>& v1,
@@ -172,10 +172,10 @@ std::vector<double> addVector(const std::vector<double>& v1,
 }
 
 /**
-    Calculates sum of elements of vector.
+   Calculates sum of elements of vector.
 
-    @param v vector to sum
-    @return sum of elements of
+   @param v vector to sum
+   @return sum of elements of
 */
 
 double sumVector(const std::vector<double>& v)
@@ -191,10 +191,10 @@ double sumVector(const std::vector<double>& v)
 
 
 /**
-    Calculates the number of people who are single in the initial population.
+   Calculates the number of people who are single in the initial population.
 
-    @param data matrix of probabilities
-    @return number of people who are single
+   @param data matrix of probabilities
+   @return number of people who are single
 */
 
 
@@ -468,9 +468,9 @@ void setDefaultParameters(ParameterMap& parameterMap)
   addParameter(parameterMap, "SCALE_SINGLE_PERIOD_INITIAL",
                "Weibull scale of single period at begin of simulation", {1200.0});
   addParameter(parameterMap, "SHAPE_SINGLE_PERIOD_DURING",
-               "Mean difference from expected relationship length", {0.4});
+               "Weibull shape of single period during simulation", {0.4});
   addParameter(parameterMap, "SCALE_SINGLE_PERIOD_DURING",
-               "Standard deviation of relationship PERIOD", {100.0});
+               "Weibull scale of single period during simulation", {100.0});
   addParameter(parameterMap, "MEAN_SINGLE_PERIOD",
                "Mean difference from expected single period", {0});
   addParameter(parameterMap, "SD_SINGLE_PERIOD",
@@ -485,7 +485,9 @@ void setDefaultParameters(ParameterMap& parameterMap)
   addParameter(parameterMap, "SD_RELATIONSHIP_PERIOD",
                "Standard deviation of relationship period.", {3.0});
 
-
+  addParameter(parameterMap, "PROB_INFECTED_IF_PARTNER",
+               "Probability on initialization of an agent being infected "
+               "if its partner is infected", {0.5});
 }
 
 void readParameters(std::istream& input,
@@ -768,7 +770,9 @@ public:
     sdRelationshipPeriodDeviation =
       parameterMap.at("SD_RELATIONSHIP_PERIOD").getDbl();
 
-
+    // Probability an agent is infected at initialisation if partner infected
+    probInfectedIfPartnerInfected =
+      parameterMap.at("PROB_INFECTED_IF_PARTNER").getDbl();
 
     string s = parameterMap.at("DISTANCE_METHOD").getStr();
     if (s == "HEURISTIC")
@@ -909,10 +913,10 @@ public:
         }
       }
       for (; i <= MAX_AGE; ++i) {
-          initialInfectionRatesMSW[i] = 0.0;
-          initialInfectionRatesMSM[i] = 0.0;
-          initialInfectionRatesWSM[i] = 0.0;
-          initialInfectionRatesWSW[i] = 0.0;
+        initialInfectionRatesMSW[i] = 0.0;
+        initialInfectionRatesMSM[i] = 0.0;
+        initialInfectionRatesWSM[i] = 0.0;
+        initialInfectionRatesWSW[i] = 0.0;
       }
     }
 
@@ -1040,23 +1044,12 @@ public:
 
     agent->singlePeriodDeviation = distSingle(rng);
     agent->relationshipPeriodDeviation = distRelationship(rng);
+  }
 
-    // agent->relationship_length_factor = 0; // norm(rng);
-
-    // agent->binomial_p_relationship_wait = uni(rng);
-    // if (agent->relationship_length_factor >= 0 &&
-    //    agent->binomial_p_relationship_wait >= 0.5) {
-    //  ++numLongBreakLongPartnership;
-    // } else if (agent->relationship_length_factor >= 0 &&
-    //           agent->binomial_p_relationship_wait < 0.5) {
-    //  ++numShortBreakLongPartnership;
-    // } else if (agent->relationship_length_factor < 0 &&
-    //           agent->binomial_p_relationship_wait >= 0.5) {
-    //  ++numLongBreakShortPartnership;
-    // } else {
-    //  ++numShortBreakShortPartnership;
-    // }
-
+  void conditionalInfectPartner(Agent *agent)
+  {
+    std::uniform_real_distribution<double> uni;
+    if (uni(rng) < probInfectedIfPartnerInfected) agent->infected = true;
   }
 
   void createPartners(AgentVector& agents,
@@ -1116,56 +1109,61 @@ public:
                 sample_matWM,
                 sample_matMM);
 
-    if (initial_relation) {
-      // Relationship
-      agent->initial_relationship = true;
-      Agent* partner = new Agent();
-      initAgent(partner, i + 2,
-                sample_ageshare,
-                femRatio,
-                wswRate,
-                msmRate,
-                initialInfectionRatesMSW,
-                initialInfectionRatesMSM,
-                initialInfectionRatesWSM,
-                initialInfectionRatesWSW,
-                sample_matWW,
-                sample_matMW,
-                sample_matWM,
-                sample_matMM);
-      // Orientation = partner's orientation
-      partner->sexual_orientation = agent->sexual_orientation;
-      // Partner sex
-      if (agent->sexual_orientation == HETEROSEXUAL) {
-        if (agent->sex == MALE)
-          partner->sex = FEMALE;
-        else
-          partner->sex = MALE;
-      } else {
-        partner->sex = agent->sex;
-      }
-      partner->age = agent->desired_age;
-      // Partner in relationship
-      partner->initial_relationship = true;
-      // Preferred age of partner
-      partner->desired_age = agent->age;
-      // partner infection risk parameters
-      setInitialInfection(*partner, initialInfectionRatesMSW,
-                          initialInfectionRatesMSM, initialInfectionRatesWSM,
-                          initialInfectionRatesWSW);
+      if (initial_relation) {
+        // Relationship
+        agent->initial_relationship = true;
+        Agent* partner = new Agent();
+        initAgent(partner, i + 2,
+                  sample_ageshare,
+                  femRatio,
+                  wswRate,
+                  msmRate,
+                  initialInfectionRatesMSW,
+                  initialInfectionRatesMSM,
+                  initialInfectionRatesWSM,
+                  initialInfectionRatesWSW,
+                  sample_matWW,
+                  sample_matMW,
+                  sample_matWM,
+                  sample_matMM);
+        // Orientation = partner's orientation
+        partner->sexual_orientation = agent->sexual_orientation;
+        // Partner sex
+        if (agent->sexual_orientation == HETEROSEXUAL) {
+          if (agent->sex == MALE)
+            partner->sex = FEMALE;
+          else
+            partner->sex = MALE;
+        } else {
+          partner->sex = agent->sex;
+        }
+        partner->age = agent->desired_age;
+        // Partner in relationship
+        partner->initial_relationship = true;
+        // Preferred age of partner
+        partner->desired_age = agent->age;
+        // partner infection risk parameters
+        setInitialInfection(*partner, initialInfectionRatesMSW,
+                            initialInfectionRatesMSM, initialInfectionRatesWSM,
+                            initialInfectionRatesWSW);
 
-      makePartner(agent, partner, distance(agent, partner));
-      // Correct relationship time because this is in the middle of relationship
-      std::uniform_real_distribution<double>
-      uni2(currentDate, agent->relationshipChangeDate);
-      agent->relationshipChangeDate = uni2(rng);
-      partner->relationshipChangeDate = agent->relationshipChangeDate;
-    } else {
-      agent->setSinglePeriod(currentDate, shapeSinglePeriodInitial,
-                             scaleSinglePeriodInitial);
-    }
-    agents.push_back(agent);
-    if (agent->partner) agents.push_back(agent->partner);
+        makePartner(agent, partner, distance(agent, partner));
+        // Correct relationship time because this is in the middle of relationship
+        std::uniform_real_distribution<double>
+          uni2(currentDate, agent->relationshipChangeDate);
+        agent->relationshipChangeDate = uni2(rng);
+        partner->relationshipChangeDate = agent->relationshipChangeDate;
+        if (agent->infected == true && partner->infected == false) {
+          conditionalInfectPartner(partner);
+        } else if (agent->infected == false && partner->infected == true) {
+          conditionalInfectPartner(agent);
+        }
+      } else {
+        agent->setSinglePeriod(currentDate, shapeSinglePeriodInitial,
+                               scaleSinglePeriodInitial);
+      }
+      agents.push_back(agent);
+      if (agent->partner) agents.push_back(agent->partner);
     }
   }
 
@@ -1399,7 +1397,7 @@ public:
       score += 50.0;
     }
     if (partnerships.exists(a->id, b->id))
-        score += 50.0;
+      score += 50.0;
     return score;
   }
 
@@ -1432,7 +1430,7 @@ public:
     }
 
     if (partnerships.exists(a->id, b->id))
-        score += 50.0;
+      score += 50.0;
 
     return score;
   }
@@ -1471,7 +1469,7 @@ public:
   double hom_male_infectiousness;
   double het_female_infectiousness;
   double hom_female_infectiousness;
-
+  double probInfectedIfPartnerInfected;
 
   double currentDate;
   double failureThresholdScore;
@@ -1796,7 +1794,7 @@ void runTests(ParameterMap& parameterMap)
 
 
   double d1 = simulation.heuristicDistance(simulation.agents[0],
-                                          simulation.agents[2]);
+                                           simulation.agents[2]);
   TESTEQ(d1, 10.0, successes, failures);
 
   double d2 = simulation.heuristicDistance(simulation.agents[2],
@@ -1804,42 +1802,42 @@ void runTests(ParameterMap& parameterMap)
   TESTEQ(d1, d2, successes, failures);
 
   d1 = simulation.heuristicDistance(simulation.agents[0],
-                                   simulation.agents[3]);
+                                    simulation.agents[3]);
   TESTEQ(d1, 65.0, successes, failures);
   d2 = simulation.heuristicDistance(simulation.agents[3],
                                     simulation.agents[0]);
   TESTEQ(d1, d2, successes, failures);
 
   d1 = simulation.heuristicDistance(simulation.agents[0],
-                                   simulation.agents[1]);
+                                    simulation.agents[1]);
   TESTEQ(d1, 62.5, successes, failures);
   d2 = simulation.heuristicDistance(simulation.agents[1],
-                                   simulation.agents[0]);
+                                    simulation.agents[0]);
   TESTEQ(d1, d2, successes, failures);
   d1 = simulation.heuristicDistance(simulation.agents[1],
-                                   simulation.agents[2]);
+                                    simulation.agents[2]);
   TESTEQ(d1, 57.5, successes, failures);
   d2 = simulation.heuristicDistance(simulation.agents[2],
                                     simulation.agents[1]);
   TESTEQ(d1, d2, successes, failures);
 
   d1 = simulation.heuristicDistance(simulation.agents[1],
-                                   simulation.agents[3]);
+                                    simulation.agents[3]);
   TESTEQ(d1, 52.5, successes, failures);
   d1 = simulation.heuristicDistance(simulation.agents[2],
-                                   simulation.agents[3]);
+                                    simulation.agents[3]);
   TESTEQ(d1, 60, successes, failures);
 
   d1 = simulation.heuristicDistance(simulation.agents[3],
-                                   simulation.agents[4]);
+                                    simulation.agents[4]);
   TESTEQ(d1, 5, successes, failures);
 
   d1 = simulation.heuristicDistance(simulation.agents[1],
-                                   simulation.agents[5]);
+                                    simulation.agents[5]);
   TESTEQ(d1, 7.5, successes, failures);
 
   d1 = simulation.tableDistance(simulation.agents[0],
-                               simulation.agents[3]);
+                                simulation.agents[3]);
   TESTEQ(fabs(d1 - 92.85787107631695) < 0.00000000001, true, successes, failures);
   d2 = simulation.tableDistance(simulation.agents[3],
                                 simulation.agents[0]);
@@ -1861,8 +1859,8 @@ void runTests(ParameterMap& parameterMap)
     CSVParser(parameterMap.at("SHAPE_REL_CSV").stringValue.
               c_str(), ",", true).convert_all_entries_to_doubles();
   simulation.scaleRelationshipPeriod =
-      CSVParser(parameterMap.at("SCALE_REL_CSV").stringValue.
-                c_str(), ",", true).convert_all_entries_to_doubles();
+    CSVParser(parameterMap.at("SCALE_REL_CSV").stringValue.
+              c_str(), ",", true).convert_all_entries_to_doubles();
   simulation.agents[6]->partner = simulation.agents[3];
   simulation.agents[3]->partner = simulation.agents[6];
   // printf("D2: %.2f %.2f\n",
