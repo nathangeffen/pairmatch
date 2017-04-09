@@ -1,4 +1,4 @@
-inp = read.csv("output_20k_3yr_smallk.csv", FALSE)
+inp = read.csv("output_20k_3yr_fewsims.csv", FALSE)
 library(xtable)
 
 # Timings

@@ -1,3 +1,6 @@
+#ifndef SAMPLE_HH
+#define SAMPLE_HH
+
 #include <iostream>
 #include <random>
 #include <vector>
@@ -36,3 +39,5 @@ private:
   ransampl_ws* ws_ = NULL;
   mt19937* rng_;
 };
+
+#endif

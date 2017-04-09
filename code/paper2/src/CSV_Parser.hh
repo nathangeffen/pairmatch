@@ -6,36 +6,38 @@
 #include <vector>
 #include <boost/algorithm/string.hpp>
 
+#include "linear.hh"
+
 extern "C" {
 #include "csvparser.h"
 }
-
-typedef std::vector< std::vector<double > > DblMatrix;
 
 class CSVParser {
 public:
   CSVParser(const char* filename,
 	    const char* delim = ",",
-	    const bool has_header = true) {
-    csvparser_ = CsvParser_new(filename, delim, has_header);
-    if (has_header) {
-      header_ = CsvParser_getHeader(csvparser_);
+	    const bool hasHeader = true)
+  {
+    csvparser = CsvParser_new(filename, delim, hasHeader);
+    assert(csvparser);
+    if (hasHeader) {
+      header_ = CsvParser_getHeader(csvparser);
       if (!header_) {
 	std::cerr << "Error getting csv header in " << filename << std::endl;
 	exit(1);
       }
     }
     CsvRow *row;
-    while ((row = CsvParser_getRow(csvparser_)) ) {
+    while ((row = CsvParser_getRow(csvparser)) ) {
       rows_.push_back(row);
       std::vector< std::string > str_row;
       const char **rowFields = CsvParser_getFields(row);
       for (int i = 0 ; i < CsvParser_getNumFields(row) ; i++)
-	str_row.push_back(rowFields[i]);
+        str_row.push_back(rowFields[i]);
       string_rows.push_back(str_row);
     }
   };
-  DblMatrix convert_all_entries_to_doubles() {
+  DblMatrix toDoubles() {
     DblMatrix double_rows;
     for (auto& r: string_rows) {
       std::vector<double> double_row;
@@ -49,16 +51,14 @@ public:
     return double_rows;
   };
   ~CSVParser() {
-    for (auto& row: rows_)
-      CsvParser_destroy_row(row);
-    CsvParser_destroy(csvparser_);
+    for (auto& row: rows_) CsvParser_destroy_row(row);
+    CsvParser_destroy(csvparser);
   };
   std::vector< std::vector<std::string> > string_rows;
 private:
+  CsvParser *csvparser;
   CsvRow *header_ = NULL;
   std::vector<CsvRow *> rows_;
-
-  CsvParser *csvparser_;
 };
 
 void print_dbl_matrix(const DblMatrix&);
